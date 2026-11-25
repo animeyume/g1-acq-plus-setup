@@ -14,7 +14,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.9'
+VERSION = '2.0.10'
 
 
 def load_products(path=APP / 'products.json'):
@@ -65,45 +65,100 @@ def select_current(session, selected):
     raise SetupError('Google Play больше не возвращает это предложение. Обновите список.')
 
 
-def interactive(session, rows, rescan):
-    page, search, include_base = 0, '', False
+def price_value(row):
+    """Numeric price of the first phase; free trials sort first."""
+    first = (row.get('phases') or [{}])[0]
+    text = str(first.get('price', '')).strip()
+    if not text or text.lower().startswith(('free', 'бесплатн')):
+        return 0.0
+    match = re.search(r'(\d+(?:[.,]\d+)?)', text)
+    return float(match.group(1).replace(',', '.')) if match else math.inf
+
+
+def months_value(row):
+    first = (row.get('phases') or [{}])[0]
+    match = re.fullmatch(r'P(\d+)([YMWD])', str(first.get('period', '')))
+    if not match:
+        return 0.0
+    return int(match.group(1)) * {'Y': 12.0, 'M': 1.0, 'W': 0.25, 'D': 0.035}[match.group(2)]
+
+
+def deal(row):
+    first = (row.get('phases') or [{}])[0]
+    line = str(first.get('price', '—')) + ' / ' + period(str(first.get('period', '—')))
+    if first.get('cycles'):
+        line += ' × ' + str(first['cycles'])
+    return line
+
+
+def group_offers(rows):
+    groups = {}
+    for row in rows:
+        groups.setdefault(row['title'] or row['product'], []).append(row)
+    for items in groups.values():
+        items.sort(key=lambda row: (price_value(row), -months_value(row), row['key']))
+    return groups
+
+
+def open_offer(session, row):
+    try:
+        row = select_current(session, row)
+        print('\n' + row['title'] + '\n' + row['product'] + '\n' + describe(row))
+        print('Окончательные условия и подтверждение подписки — в окне Google Play в эмуляторе.')
+        if input('Открыть окно оформления этого варианта? [y/N]: ').strip().lower() in ('y', 'yes', 'д', 'да'):
+            result = session.checkout(row['key'])
+            if result['code'] == 0:
+                print('Окно Google Play открыто в эмуляторе. Скрипт подписку не подтверждает.')
+                visit()
+            else:
+                print('Google Play отказал: ' + str(result['code']) + ' ' + result.get('message', ''))
+    except Exception as error:
+        print('Не удалось открыть вариант: ' + str(error))
+
+
+def offer_menu(session, title, items):
     while True:
-        visible = [r for r in rows if (include_base or r['offer']) and
-                   (not search or search in (r['title'] + ' ' + r['product']).lower())]
-        page = max(0, min(page, max(0, (len(visible) - 1) // 15)))
-        print(f'\nG1 ACQ Plus — ответы Google Play | {len(visible)} вариантов | страница {page + 1}/{max(1, math.ceil(len(visible) / 15))}')
-        for index in range(page * 15, min((page + 1) * 15, len(visible))):
-            row = visible[index]
-            print(f"{index + 1:3}. {row['title']} | {row['offer'] or 'базовый тариф'}\n     {describe(row)}")
-        print('Номер — проверить вариант; /текст — поиск; n/p — страницы; a — базовые тарифы; r — обновить; q — выход')
+        print(f'\n{title} — {len(items)} вариантов, лучшие сверху')
+        for number, row in enumerate(items, 1):
+            print(f"{number:3}. {row['offer']} | {deal(row)}")
+            print('     ' + describe(row))
+        print('Номер — подробнее и открыть окно; b — назад к категориям; q — выход')
+        raw = input('> ').strip()
+        if raw.lower() == 'q':
+            return 'quit'
+        if raw.lower() in ('b', ''):
+            return
+        if raw.isdigit() and 1 <= int(raw) <= len(items):
+            open_offer(session, items[int(raw) - 1])
+
+
+def interactive(session, rows, rescan):
+    search = ''
+    while True:
+        offers = [row for row in rows if row['offer']]
+        if not offers:
+            print('Google Play вернул только базовые тарифы: показываю их без скидок.', flush=True)
+            offers = rows
+        grouped = group_offers(offers)
+        titles = sorted(grouped, key=lambda title: (-len(grouped[title]), title))
+        if search:
+            titles = [title for title in titles if search in title.lower() or any(
+                search in (row['product'] + ' ' + str(row['offer'])).lower() for row in grouped[title])]
+        print(f'\nG1 ACQ Plus — категории предложений | {len(offers)} вариантов')
+        for number, title in enumerate(titles, 1):
+            print(f'{number:3}. {title} — {len(grouped[title])}')
+        print('Номер — открыть категорию; /текст — поиск; r — обновить; q — выход')
         raw = input('> ').strip()
         if raw.lower() == 'q':
             return
-        if raw.lower() == 'n':
-            page += 1
-        elif raw.lower() == 'p':
-            page -= 1
-        elif raw.lower() == 'a':
-            include_base, page = not include_base, 0
-        elif raw.lower() == 'r':
-            rows, page = rescan(), 0
+        if raw.lower() == 'r':
+            rows, search = rescan(), ''
         elif raw.startswith('/'):
-            search, page = raw[1:].lower(), 0
-        elif raw.isdigit() and 1 <= int(raw) <= len(visible):
-            try:
-                row = select_current(session, visible[int(raw) - 1])
-                print('\n' + row['title'] + '\n' + row['product'] + '\n' + describe(row))
-                print('Окончательные условия и подтверждение подписки — в окне Google Play в эмуляторе.')
-                if input('Открыть окно оформления этого варианта? [y/N]: ').strip().lower() in ('y', 'yes', 'д', 'да'):
-                    result = session.checkout(row['key'])
-                    if result['code'] == 0:
-                        print('Окно Google Play открыто в эмуляторе. Скрипт подписку не подтверждает.')
-                        visit()
-                    else:
-                        print('Google Play отказал: ' + str(result['code']) + ' ' + result.get('message', ''))
-            except Exception as error:
-                print('Не удалось открыть вариант: ' + str(error))
-            input('Enter — вернуться к списку: ')
+            search = raw[1:].lower()
+        elif raw.isdigit() and 1 <= int(raw) <= len(titles):
+            title = titles[int(raw) - 1]
+            if offer_menu(session, title, grouped[title]) == 'quit':
+                return
 
 
 def run_catalog(session, catalog, work, limit=None, scan_only=False):

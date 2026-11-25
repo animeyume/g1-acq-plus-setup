@@ -37,6 +37,20 @@ class CatalogTests(unittest.TestCase):
         self.assertTrue(all(len(c.args[0]) <= 20 for c in session.query.call_args_list))
         session.checkout.assert_not_called()
 
+    def test_offers_are_grouped_and_sorted_best_first(self):
+        rows = [
+            {'key': 'b', 'product': 'g1.100gb', 'title': '100 GB (Google One)', 'base_plan': 'm', 'offer': 'introprice',
+             'phases': [{'price': '1,99 €', 'period': 'P1M', 'cycles': 0}]},
+            {'key': 'a', 'product': 'g1.100gb', 'title': '100 GB (Google One)', 'base_plan': 'm', 'offer': 'freetrial',
+             'phases': [{'price': 'Бесплатно', 'period': 'P1Y', 'cycles': 1}]},
+            {'key': 'c', 'product': 'g1.2tb.ai', 'title': 'Google AI Pro (5 TB)', 'base_plan': 'm', 'offer': 'introprice',
+             'phases': [{'price': '0,99 €', 'period': 'P3M', 'cycles': 1}]},
+        ]
+        grouped = g1plus.group_offers(rows)
+        self.assertEqual(sorted(grouped), ['100 GB (Google One)', 'Google AI Pro (5 TB)'])
+        self.assertEqual([row['key'] for row in grouped['100 GB (Google One)']], ['a', 'b'])
+        self.assertEqual(len(grouped['Google AI Pro (5 TB)']), 1)
+
     def test_missing_offer_does_not_fall_back(self):
         session = Mock()
         session.query.return_value = [{'key': 'different', 'product': 'g1.2tb.ai'}]
@@ -49,7 +63,7 @@ class CatalogTests(unittest.TestCase):
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', '1', '', 'b', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_not_called()
         visit.assert_not_called()
@@ -60,7 +74,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', 'y', '', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', '1', 'y', 'b', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
         visit.assert_called_once_with()
@@ -71,7 +85,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
-        with patch('builtins.input', side_effect=['1', 'y', '', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', '1', 'y', 'b', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         visit.assert_not_called()
 
