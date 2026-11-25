@@ -7,6 +7,7 @@ from pathlib import Path
 import platform
 import re
 import sys
+import textwrap
 import traceback
 
 from support import Adb, SetupError
@@ -14,7 +15,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.12'
+VERSION = '2.0.13'
 
 
 def load_products(path=APP / 'products.json'):
@@ -163,7 +164,11 @@ def interactive(session, rows, rescan):
         cells = [(title, price_cell(row), time_cell(row), renew_cell(row)) for title, row in table]
         widths = [max(len(item[column]) for item in cells) for column in range(4)]
         widths[0] = max(widths[0], len('Подписка'))
-        print(f'\nG1 ACQ Plus — {len(table)} вариантов из Google Play\n')
+        print(f'\nG1 ACQ Plus — {len(table)} вариантов из Google Play')
+        summary = ' · '.join(f"{title} — {len(grouped[title])}" for title in titles)
+        for line in textwrap.wrap(summary, 110):
+            print(line)
+        print()
         print(f"{'№':>3}  {'Подписка':<{widths[0]}}  {'Цена':>{widths[1]}}  {'Срок':>{widths[2]}}  {'Далее':>{widths[3]}}")
         for number, item in enumerate(cells, 1):
             print(f'{number:3}  {item[0]:<{widths[0]}}  {item[1]:>{widths[1]}}  {item[2]:>{widths[2]}}  {item[3]:>{widths[3]}}')
