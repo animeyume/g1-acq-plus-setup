@@ -375,5 +375,74 @@ class LDPlayerTests(unittest.TestCase):
                 ldplayer.Console('ldconsole.exe').instances()
 
 
+class LDPlayerReservedPortTests(unittest.TestCase):
+    """Windows Hyper-V/WSL reserve 5544-5643, so LDPlayer's bridge on 5555 never binds."""
+
+    NETSH = ('Protocol tcp Port Exclusion Ranges\n\n'
+             'Start Port    End Port\n'
+             '----------    --------\n'
+             '      2892        2991\n'
+             '      5544        5643\n'
+             '     50000        50059     *\n')
+
+    def console(self, root):
+        exe = Path(root) / 'ldconsole.exe'
+        exe.touch()
+        (Path(root) / 'adb.exe').touch()
+        return Mock(exe=exe)
+
+    def test_excluded_ranges_parsed_from_netsh_output(self):
+        with patch.object(ldplayer.os, 'name', 'nt'), \
+                patch('ldplayer.subprocess.run', return_value=Mock(stdout=self.NETSH, returncode=0)):
+            self.assertEqual(ldplayer.reserved_tcp_ports(), [(2892, 2991), (5544, 5643), (50000, 50059)])
+            self.assertTrue(ldplayer.port_reserved(5555))
+            self.assertFalse(ldplayer.port_reserved(15555))
+        with patch.object(ldplayer.os, 'name', 'nt'), \
+                patch('ldplayer.subprocess.run', return_value=Mock(stdout='', returncode=1)):
+            self.assertEqual(ldplayer.reserved_tcp_ports(), [])
+            self.assertFalse(ldplayer.port_reserved(5555))
+
+    def test_reserved_port_connects_through_forward_without_marker(self):
+        with tempfile.TemporaryDirectory() as root:
+            console = self.console(root)
+            listed = Mock(stdout='List of devices attached\n127.0.0.1:15555\tdevice\n', stderr='', returncode=0)
+            with patch.object(ldplayer.os, 'name', 'nt'), \
+                    patch('ldplayer.reserved_tcp_ports', return_value=[(5544, 5643)]), \
+                    patch('ldplayer.open_adb_forward', return_value=15555) as forward, \
+                    patch('ldplayer.run', return_value=listed), \
+                    patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                self.assertIs(ldplayer.connect_verified(console, 0), cls.return_value)
+            forward.assert_called_once_with(console, 0)
+            cls.assert_called_once_with(Path(root) / 'adb.exe', '127.0.0.1:15555', allow_emulator=True)
+
+    def test_forward_targets_only_the_selected_instance(self):
+        with patch('ldplayer.find_vboxmanage', return_value=Path('VBoxManage.exe')), \
+                patch('ldplayer.running_vms', return_value=['leidian0', 'leidian1']):
+            self.assertIsNone(ldplayer.vm_for_index(Path('VBoxManage.exe'), 4))
+            self.assertEqual(ldplayer.vm_for_index(Path('VBoxManage.exe'), 1), 'leidian1')
+
+    def test_forward_skips_reserved_and_failed_host_ports(self):
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append(list(args))
+            return Mock(returncode=0 if 'natpf1' in args else 1)
+
+        with patch('ldplayer.find_vboxmanage', return_value=Path('VBoxManage.exe')), \
+                patch('ldplayer.running_vms', return_value=['leidian0']), \
+                patch('ldplayer.reserved_tcp_ports', return_value=[(15555, 15555)]), \
+                patch('ldplayer.subprocess.run', side_effect=fake_run):
+            self.assertEqual(ldplayer.open_adb_forward(Path('ldconsole.exe'), 0), 15556)
+        self.assertIn(['VBoxManage.exe', 'controlvm', 'leidian0', 'natpf1', 'g1adb,tcp,127.0.0.1,15556,,5555'],
+                      [call for call in calls if call[-1].startswith('g1adb,tcp')])
+
+    def test_forward_needs_vboxmanage_and_running_vm(self):
+        with patch('ldplayer.find_vboxmanage', return_value=None):
+            self.assertIsNone(ldplayer.open_adb_forward(Path('ldconsole.exe'), 0))
+        with patch('ldplayer.find_vboxmanage', return_value=Path('VBoxManage.exe')), \
+                patch('ldplayer.running_vms', return_value=[]):
+            self.assertIsNone(ldplayer.open_adb_forward(Path('ldconsole.exe'), 0))
+
+
 if __name__ == '__main__':
     unittest.main()

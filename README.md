@@ -1,6 +1,6 @@
 # G1 ACQ Plus — установка и запуск
 
-**Версия 2.0.2 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
+**Версия 2.0.3 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
 
 Скрипт подготавливает среду Python, настраивает Android-эмулятор, включает права суперпользователя (root) на выбранном устройстве и открывает меню предложений Google One. Цены и периоды для вашего аккаунта запрашиваются у Google Play.
 
@@ -26,13 +26,13 @@
 ### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/19f77b16ccae9237731da180114ffc11def01b63/Windows-OneClick.ps1' -OutFile ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -ErrorAction Stop; if(-not (Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf)){throw 'Download did not create a file'}; if((Get-FileHash -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Algorithm SHA256 -ErrorAction Stop).Hash -ne '74cf030a5bc5795af6b8d4bc3a7b189984a4850c40c6393388d8dfc3f3001e78'){throw 'Checksum mismatch'}; . ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))); exit (Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue) } finally { if(Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf){Remove-Item -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Force -ErrorAction SilentlyContinue} }"
+{{WINDOWS_COMMAND}}
 ```
 
 ### Mac — Terminal
 
 ```zsh
-(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/19f77b16ccae9237731da180114ffc11def01b63/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = '54a7fd90eedde83209e394441ab765edcc30603cb00a31fb72a277310edbf642' ] && /bin/zsh "$g1_script")
+{{MAC_COMMAND}}
 ```
 
 ### Запуск Windows из архива
@@ -58,7 +58,25 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.S
 
 В LDPlayer откройте **Настройки → Другие настройки → Отладка ADB → Локальное подключение** (`Settings → Other settings → ADB debugging → Open local connection`). Сохраните настройки и дождитесь перезапуска устройства, если эмулятор его запросит. Это соответствует [инструкции LDPlayer](https://www.ldplayer.net/support/how-to-solve-locked-screen.html).
 
+Скрипт получает фактические имена устройств из `adb devices`, включая `emulator-5554`, и проверяет принадлежность выбранному LDPlayer через его консоль. Адрес `127.0.0.1:5555` используется только как запасная подсказка при пустом списке устройств. Ответы ADB сохраняются локально в `adb-diagnostic.json`; сообщения больше не сводят любую ошибку к отключённой настройке ADB.
+
 Скрипт показывает текущую проверку и оставшееся время. Если подключиться не удалось, **Enter повторяет проверку в том же запуске**, а `Q` завершает ожидание. Root после подключения проверяется и при необходимости включается для выбранного устройства.
+
+### Если ADB включён, но устройство не видно
+
+На Windows Hyper-V, WSL и WinNAT занимают диапазон TCP-портов `5544–5643`. Порт LDPlayer `5555` попадает внутрь, поэтому эмулятор не может открыть свой ADB-мост: `ldconsole adb` ищет `emulator-5554`, `adb devices` пуст, а `adb connect 127.0.0.1:5555` возвращает `10061`. Это не сбой эмулятора, и включение ADB в настройках ничего не меняет.
+
+Скрипт распознаёт такую ситуацию по `netsh int ipv4 show excludedportrange protocol=tcp` и сам открывает обходной мост `127.0.0.1:15555 → гость:5555` через `VBoxManage.exe` того же виртуального устройства. Проверка маркером через `ldconsole` в этом случае пропускается: мост создан именно на выбранной ВМ, поэтому соответствие устройства известно. Правило живёт до перезапуска эмулятора, и скрипт создаёт его заново при каждом подключении — вручную ничего делать не нужно.
+
+Постоянное решение (порт 5555 навсегда остаётся за приложениями), командная строка от администратора:
+
+```powershell
+net stop winnat
+netsh int ipv4 add excludedportrange protocol=tcp startport=5555 numberofports=1 store=persistent
+net start winnat
+```
+
+Затем полностью закройте и снова откройте LDPlayer. Проверка: `netsh int ipv4 show excludedportrange protocol=tcp` больше не показывает диапазон, перекрывающий `5555`, а `adb devices -l` из папки LDPlayer содержит устройство.
 
 ## Таблицы тарифов на русском
 
@@ -155,7 +173,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.S
 - Windows 10/11 на Intel или AMD, 64-бит; Mac на Apple Silicon M1 и новее.
 - Для отдельной среды Python требуется около 2 ГиБ свободного места; место для эмулятора проверяйте по требованиям его установщика.
 - Реально проверены установка Python 3.13.18 и зависимостей на Mac, повторный запуск из пути с пробелами и кириллицей.
-- Пройдены 33 Python-теста, 10 проверок подключения BillingClient с имитацией Android API, 4 проверки установки среды в PowerShell и 12 проверок загрузки и запуска команды Windows. На безопасных тестовых файлах проверены ошибки загрузки, хеш, сохранение кода завершения и передача аргумента PowerShell. Windows cmd в текущем окружении недоступен.
+- Пройдены 40 Python-тестов, 10 проверок подключения BillingClient с имитацией Android API, 4 проверки установки среды в PowerShell и 12 проверок загрузки и запуска команды Windows. На безопасных тестовых файлах проверены ошибки загрузки, хеш, сохранение кода завершения и передача аргумента PowerShell. Windows cmd в текущем окружении недоступен.
 - Полная установка на Windows и полный цикл оформления Google One в LDPlayer/MuMu в текущем окружении не проверены.
 
 Подробная инструкция: **[README-RU.txt](README-RU.txt)**.

@@ -213,6 +213,98 @@ def wait_state(console, index, started, timeout=240):
     raise SetupError('LDPlayer не завершил запуск/остановку. Проверьте окно эмулятора и повторите запуск.')
 
 
+def reserved_tcp_ports():
+    """Windows hides Hyper-V/WSL/WinNAT ranges from ordinary sockets (WSAEACCES)."""
+    if os.name != 'nt':
+        return []
+    try:
+        result = subprocess.run(['netsh', 'int', 'ipv4', 'show', 'excludedportrange', 'protocol=tcp'],
+                                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    ranges = []
+    for line in result.stdout.splitlines():
+        match = re.fullmatch(r'\s*(\d{1,5})\s+(\d{1,5})\s*\*?\s*', line)
+        if not match:
+            continue
+        start, end = int(match[1]), int(match[2])
+        if 0 < start <= end < 65536:
+            ranges.append((start, end))
+    return ranges
+
+
+def port_reserved(port):
+    return any(start <= port <= end for start, end in reserved_tcp_ports())
+
+
+def find_vboxmanage(console):
+    folders = [Path(os.environ[name]) for name in ('ProgramFiles', 'ProgramFiles(x86)') if os.environ.get(name)]
+    room = console.exe.parent
+    folders.extend((room, room.parent, room.parent.parent))
+    for folder in folders:
+        try:
+            candidates = [folder / 'VBoxManage.exe', *sorted(folder.glob('*box*/VBoxManage.exe'))]
+        except OSError:
+            candidates = [folder / 'VBoxManage.exe']
+        for path in candidates:
+            try:
+                if path.is_file():
+                    return path
+            except OSError:
+                continue
+    return None
+
+
+def running_vms(vbox):
+    try:
+        result = subprocess.run([str(vbox), 'list', 'runningvms'], capture_output=True, text=True,
+                                encoding='utf-8', errors='replace', timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    names = []
+    for line in result.stdout.splitlines():
+        match = re.match(r'\s*"([^"]+)"\s*\{', line)
+        if match:
+            names.append(match[1])
+    return names
+
+
+def vm_for_index(vbox, index):
+    expected = 'leidian' + str(index)
+    return next((name for name in running_vms(vbox) if name.lower() == expected), None)
+
+
+def open_adb_forward(console, index, guest=5555, rule='g1adb', attempts=20):
+    """Forward a free local port to the guest ADB port of exactly this LDPlayer VM.
+
+    LDPlayer's own bridge (host 5555, and 5555+2*index) cannot bind when Windows
+    reserved that port, so bind the VM's guest 5555 to a port Windows left free.
+    """
+    vbox = find_vboxmanage(console)
+    if not vbox:
+        return None
+    vm = vm_for_index(vbox, index)
+    if not vm:
+        return None
+    blocked = reserved_tcp_ports()
+    for offset in range(attempts):
+        host = 15555 + index * 2 + offset
+        if host > 65535:
+            break
+        if any(start <= host <= end for start, end in blocked):
+            continue
+        try:
+            subprocess.run([str(vbox), 'controlvm', vm, 'natpf1', 'delete', rule],
+                           capture_output=True, timeout=20)
+            added = subprocess.run([str(vbox), 'controlvm', vm, 'natpf1', f'{rule},tcp,127.0.0.1,{host},,{guest}'],
+                                   capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if not added.returncode:
+            return host
+    return None
+
+
 def parse_adb_devices(text):
     result = []
     for line in text.splitlines():
@@ -228,6 +320,17 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
         raise SetupError('В выбранной папке LDPlayer отсутствует adb.exe.')
     port = 5555 + index * 2
     hint = f'127.0.0.1:{port}' if port < 65536 else None
+    forward = None
+    if hint and port_reserved(port):
+        print(f'Порт {port} зарезервирован Windows (Hyper-V/WSL/WinNAT): открываю обходной мост.', flush=True)
+        forward = open_adb_forward(console, index)
+        if forward:
+            hint = f'127.0.0.1:{forward}'
+            print('Обходной мост ' + hint + ' → ADB устройства LDPlayer ' + str(index) + '.', flush=True)
+            try:
+                run([exe, 'disconnect', hint], timeout=10, check=False)
+            except (SetupError, OSError, subprocess.SubprocessError):
+                pass
     marker = '/data/local/tmp/g1plus-device-' + secrets.token_hex(16)
     deadline = time.monotonic() + timeout
     next_notice = 0
@@ -276,10 +379,14 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
                 for serial in online:
                     candidate = Adb(exe, serial, allow_emulator=True)
                     try:
-                        marker_reply = candidate.shell('ls', marker, timeout=5, check=False).strip()
-                        if marker_reply != marker:
-                            report['last_error'] = serial + ': устройство не подтвердило метку выбранного LDPlayer. ' + marker_reply[-250:]
-                            continue
+                        # The vendor console cannot create the marker while the
+                        # vendor bridge is blocked, but a rule we created on the
+                        # selected VM proves the mapping on its own.
+                        if not (forward and serial == hint):
+                            marker_reply = candidate.shell('ls', marker, timeout=5, check=False).strip()
+                            if marker_reply != marker:
+                                report['last_error'] = serial + ': устройство не подтвердило метку выбранного LDPlayer. ' + marker_reply[-250:]
+                                continue
                         candidate.connect()
                     except (SetupError, subprocess.SubprocessError) as error:
                         report['last_error'] = serial + ': ' + str(error)
@@ -300,6 +407,10 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
                         messages.append(label + ': ' + report[key][-500:])
                 if diagnostic_path:
                     messages.append('Отчёт ADB: ' + str(diagnostic_path))
+                if port_reserved(port):
+                    messages.append('Порт ' + str(port) + ' зарезервирован Windows: запустите командную строку от администратора, выполните'
+                                    ' net stop winnat, netsh int ipv4 add excludedportrange protocol=tcp startport=5555 numberofports=1 store=persistent,'
+                                    ' net start winnat, затем перезапустите эмулятор.')
                 raise AdbUnavailable('\n'.join(messages))
             time.sleep(2)
     finally:
