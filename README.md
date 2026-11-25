@@ -26,3 +26,7 @@ Windows: LDPlayer. macOS Apple Silicon: MuMu.
 Проверены установка среды на Mac, 27 Python-тестов, 10 офлайн-проверок Billing bridge
 и 4 проверки Windows runtime через PowerShell. Полный цикл в реальном Android
 и установка на Windows в текущем окружении не проверены.
+
+Команды для вставки: [COMMANDS.txt](COMMANDS.txt).
+
+![Пример баннера спонсора](sponsor-preview.png)
