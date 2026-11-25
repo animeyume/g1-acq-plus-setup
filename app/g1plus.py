@@ -14,7 +14,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.11'
+VERSION = '2.0.12'
 
 
 def load_products(path=APP / 'products.json'):
@@ -142,6 +142,7 @@ def open_offer(session, row):
             result = session.checkout(row['key'])
             if result['code'] == 0:
                 print('Окно Google Play открыто в эмуляторе. Скрипт подписку не подтверждает.')
+                credit()
                 visit()
             else:
                 print('Google Play отказал: ' + str(result['code']) + ' ' + result.get('message', ''))
@@ -191,10 +192,8 @@ def run_catalog(session, catalog, work, limit=None, scan_only=False):
         return
     if not rows:
         raise SetupError('Для этого аккаунта Google Play не вернул предложения из каталога.')
-    credit()
     if not any(row['offer'] for row in rows):
-        print('Для этого аккаунта Google Play вернул только базовые тарифы; в меню нажмите «a».', flush=True)
-    input('Enter — открыть каталог предложений: ')
+        print('Для этого аккаунта Google Play вернул только базовые тарифы.', flush=True)
     interactive(session, rows, rescan)
 
 

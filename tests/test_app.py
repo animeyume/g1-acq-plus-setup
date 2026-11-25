@@ -63,10 +63,12 @@ class CatalogTests(unittest.TestCase):
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
+                patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_not_called()
         visit.assert_not_called()
+        credit.assert_not_called()
 
     def test_explicit_yes_opens_selected_offer_only(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
@@ -74,10 +76,12 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit, \
+                patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
         visit.assert_called_once_with()
+        credit.assert_called_once_with()
 
     def test_refused_checkout_keeps_site_closed(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
@@ -85,9 +89,11 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
-        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit, \
+                patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         visit.assert_not_called()
+        credit.assert_not_called()
 
 
 class DeviceTests(unittest.TestCase):
@@ -229,7 +235,7 @@ class SponsorTests(unittest.TestCase):
     def setUp(self):
         sponsor._visited = False
 
-    def test_catalog_credits_sponsor_but_keeps_site_closed(self):
+    def test_catalog_shows_no_sponsor_screens(self):
         row = {'key': 'one', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'm', 'offer': 'trial'}
         session = Mock()
         session.query.return_value = [row]
@@ -238,7 +244,7 @@ class SponsorTests(unittest.TestCase):
                 patch('builtins.input', return_value=''), \
                 patch('g1plus.interactive', side_effect=lambda s, rows, refresh: (refresh(), refresh())):
             g1plus.run_catalog(session, g1plus.load_products(), Path(root), limit=1)
-        credit.assert_called_once_with()
+        credit.assert_not_called()
         visit.assert_not_called()
         self.assertEqual(session.query.call_count, 3)
         session.checkout.assert_not_called()

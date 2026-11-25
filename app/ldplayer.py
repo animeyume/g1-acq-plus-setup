@@ -420,6 +420,9 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
                     run([exe, 'disconnect', '127.0.0.1:' + str(bridge)], timeout=10, check=False)
                 except (SetupError, OSError, subprocess.SubprocessError):
                     pass
+            else:
+                print('Свой ADB-мост не создан: не найден VBoxManage.exe или запущенная ВМ leidian' + str(index)
+                      + '. Работаю через штатный мост LDPlayer.', flush=True)
         return '127.0.0.1:' + str(bridge) if bridge else None
 
     def verified(candidate):
