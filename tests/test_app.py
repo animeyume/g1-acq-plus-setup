@@ -375,8 +375,8 @@ class LDPlayerTests(unittest.TestCase):
                 ldplayer.Console('ldconsole.exe').instances()
 
 
-class LDPlayerReservedPortTests(unittest.TestCase):
-    """Windows Hyper-V/WSL reserve 5544-5643, so LDPlayer's bridge on 5555 never binds."""
+class LDPlayerBridgeTests(unittest.TestCase):
+    """The script must reach ADB on its own, without admin netsh or manual steps."""
 
     NETSH = ('Protocol tcp Port Exclusion Ranges\n\n'
              'Start Port    End Port\n'
@@ -395,25 +395,46 @@ class LDPlayerReservedPortTests(unittest.TestCase):
         with patch.object(ldplayer.os, 'name', 'nt'), \
                 patch('ldplayer.subprocess.run', return_value=Mock(stdout=self.NETSH, returncode=0)):
             self.assertEqual(ldplayer.reserved_tcp_ports(), [(2892, 2991), (5544, 5643), (50000, 50059)])
-            self.assertTrue(ldplayer.port_reserved(5555))
             self.assertFalse(ldplayer.port_reserved(15555))
         with patch.object(ldplayer.os, 'name', 'nt'), \
                 patch('ldplayer.subprocess.run', return_value=Mock(stdout='', returncode=1)):
             self.assertEqual(ldplayer.reserved_tcp_ports(), [])
-            self.assertFalse(ldplayer.port_reserved(5555))
 
-    def test_reserved_port_connects_through_forward_without_marker(self):
+    def test_own_bridge_is_used_without_vendor_console(self):
         with tempfile.TemporaryDirectory() as root:
             console = self.console(root)
-            listed = Mock(stdout='List of devices attached\n127.0.0.1:15555\tdevice\n', stderr='', returncode=0)
-            with patch.object(ldplayer.os, 'name', 'nt'), \
-                    patch('ldplayer.reserved_tcp_ports', return_value=[(5544, 5643)]), \
-                    patch('ldplayer.open_adb_forward', return_value=15555) as forward, \
-                    patch('ldplayer.run', return_value=listed), \
+            with patch('ldplayer.open_adb_forward', return_value=15555) as forward, \
                     patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
                 self.assertIs(ldplayer.connect_verified(console, 0), cls.return_value)
             forward.assert_called_once_with(console, 0)
             cls.assert_called_once_with(Path(root) / 'adb.exe', '127.0.0.1:15555', allow_emulator=True)
+            console.selected.assert_not_called()
+
+    def test_own_bridge_wins_over_foreign_device_on_another_port(self):
+        # The operator may already have a working adb2 rule on 15555; our own
+        # rule lands on the next free port and must be preferred.
+        with tempfile.TemporaryDirectory() as root:
+            console = self.console(root)
+            listed = Mock(stdout='List of devices attached\n127.0.0.1:15555\tdevice\n', stderr='', returncode=0)
+            with patch('ldplayer.open_adb_forward', return_value=15556), \
+                    patch('ldplayer.run', return_value=listed), \
+                    patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                self.assertIs(ldplayer.connect_verified(console, 0), cls.return_value)
+            cls.assert_called_once_with(Path(root) / 'adb.exe', '127.0.0.1:15556', allow_emulator=True)
+            console.selected.assert_not_called()
+
+    def test_without_vboxmanage_vendor_mapping_is_still_verified_by_marker(self):
+        with tempfile.TemporaryDirectory() as root:
+            console = self.console(root)
+            marker = '/data/local/tmp/g1plus-device-abc123'
+            listed = Mock(stdout='List of devices attached\n127.0.0.1:5555\tdevice\n', stderr='', returncode=0)
+            with patch('ldplayer.open_adb_forward', return_value=None), \
+                    patch('ldplayer.secrets.token_hex', return_value='abc123'), \
+                    patch('ldplayer.run', return_value=listed), \
+                    patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                cls.return_value.shell.return_value = marker
+                self.assertIs(ldplayer.connect_verified(console, 0), cls.return_value)
+            console.selected.assert_called_once_with(0, 'adb', '--command', 'shell touch ' + marker)
 
     def test_forward_targets_only_the_selected_instance(self):
         with patch('ldplayer.find_vboxmanage', return_value=Path('VBoxManage.exe')), \

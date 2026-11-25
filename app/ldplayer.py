@@ -320,23 +320,13 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
         raise SetupError('В выбранной папке LDPlayer отсутствует adb.exe.')
     port = 5555 + index * 2
     hint = f'127.0.0.1:{port}' if port < 65536 else None
-    forward = None
-    if hint and port_reserved(port):
-        print(f'Порт {port} зарезервирован Windows (Hyper-V/WSL/WinNAT): открываю обходной мост.', flush=True)
-        forward = open_adb_forward(console, index)
-        if forward:
-            hint = f'127.0.0.1:{forward}'
-            print('Обходной мост ' + hint + ' → ADB устройства LDPlayer ' + str(index) + '.', flush=True)
-            try:
-                run([exe, 'disconnect', hint], timeout=10, check=False)
-            except (SetupError, OSError, subprocess.SubprocessError):
-                pass
     marker = '/data/local/tmp/g1plus-device-' + secrets.token_hex(16)
     deadline = time.monotonic() + timeout
     next_notice = 0
     tcp_tried = False
+    bridge, bridge_checked = None, False
     report = {'console': str(console.exe), 'index': index, 'devices': [], 'console_adb': '',
-              'tcp_response': '', 'last_error': '', 'verified_serial': None}
+              'tcp_response': '', 'last_error': '', 'verified_serial': None, 'bridge': None}
 
     def save():
         if diagnostic_path:
@@ -345,72 +335,101 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
             except OSError:
                 pass
 
+    def own_serial():
+        """Our own NAT rule forwards a free host port to this VM's guest ADB only."""
+        nonlocal bridge, bridge_checked
+        if not bridge_checked:
+            bridge_checked = True
+            bridge = open_adb_forward(console, index)
+            report['bridge'] = bridge
+            if bridge:
+                print('Штатный ADB-мост LDPlayer недоступен; открываю свой: 127.0.0.1:' + str(bridge)
+                      + ' → устройство ' + str(index) + '.', flush=True)
+                try:
+                    run([exe, 'disconnect', '127.0.0.1:' + str(bridge)], timeout=10, check=False)
+                except (SetupError, OSError, subprocess.SubprocessError):
+                    pass
+        return '127.0.0.1:' + str(bridge) if bridge else None
+
+    def verified(candidate):
+        serial = str(candidate.serial)
+        try:
+            candidate.connect()
+        except (SetupError, subprocess.SubprocessError) as error:
+            report['last_error'] = serial + ': ' + str(error)
+            return None
+        report['verified_serial'] = serial
+        save()
+        print('Подтверждено устройство выбранного LDPlayer: ' + serial, flush=True)
+        return candidate
+
+    def list_local():
+        try:
+            listed = run([exe, 'devices', '-l'], timeout=10, check=False)
+        except (SetupError, OSError, subprocess.SubprocessError) as error:
+            report['last_error'] = str(error)
+            return []
+        report['devices_output'] = (listed.stdout + listed.stderr).strip()
+        report['devices'] = parse_adb_devices(listed.stdout)
+        return [row['serial'] for row in report['devices'] if row['state'] == 'device']
+
     try:
+        # Our own bridge is tried first: it belongs to exactly the selected VM,
+        # so it needs neither the reserved vendor port nor the vendor console.
         while True:
             now = time.monotonic()
             if now >= next_notice:
-                print(f'Ищу ADB-устройство LDPlayer {index}; осталось {max(0, int(deadline-now))} с.', flush=True)
+                print(f'Подключаю ADB к устройству LDPlayer {index}; осталось {max(0, int(deadline-now))} с.', flush=True)
                 next_notice = now + 10
+            own = own_serial()
+            if own:
+                found = verified(Adb(exe, own, allow_emulator=True))
+                if found:
+                    return found
             try:
-                # Let the vendor console address the selected instance first.
-                # This can also register its emulator transport with adb.
                 report['console_adb'] = console.selected(index, 'adb', '--command', 'shell touch ' + marker)
             except (SetupError, OSError, subprocess.SubprocessError) as error:
                 report['console_adb'] = str(error)
-            try:
-                listed = run([exe, 'devices', '-l'], timeout=10, check=False)
-                report['devices_output'] = (listed.stdout + listed.stderr).strip()
-                report['devices'] = parse_adb_devices(listed.stdout)
-                if listed.returncode:
-                    report['last_error'] = report['devices_output']
-                online = [row['serial'] for row in report['devices'] if row['state'] == 'device']
-                # Only try the legacy default as a hint if adb has no online
-                # local transports. A failed TCP hint never hides real devices.
-                if not online and hint and not tcp_tried:
-                    tcp_tried = True
+            online = list_local()
+            # Let adb register the vendor transport of this instance; a failed
+            # TCP hint never hides devices adb already reports.
+            if not online and hint and not tcp_tried:
+                tcp_tried = True
+                try:
                     connected = run([exe, 'connect', hint], timeout=10, check=False)
                     report['tcp_response'] = (connected.stdout + connected.stderr).strip()
-                    listed = run([exe, 'devices', '-l'], timeout=10, check=False)
-                    report['devices_output'] = (listed.stdout + listed.stderr).strip()
-                    report['devices'] = parse_adb_devices(listed.stdout)
-                    online = [row['serial'] for row in report['devices'] if row['state'] == 'device']
-                expected = f'emulator-{5554 + index * 2}'
-                online.sort(key=lambda serial: (serial != expected, not serial.startswith('emulator-'), serial))
-                for serial in online:
-                    candidate = Adb(exe, serial, allow_emulator=True)
-                    try:
-                        # The vendor console cannot create the marker while the
-                        # vendor bridge is blocked, but a rule we created on the
-                        # selected VM proves the mapping on its own.
-                        if not (forward and serial == hint):
-                            marker_reply = candidate.shell('ls', marker, timeout=5, check=False).strip()
-                            if marker_reply != marker:
-                                report['last_error'] = serial + ': устройство не подтвердило метку выбранного LDPlayer. ' + marker_reply[-250:]
-                                continue
-                        candidate.connect()
-                    except (SetupError, subprocess.SubprocessError) as error:
-                        report['last_error'] = serial + ': ' + str(error)
-                        continue
-                    candidate.shell('rm', '-f', marker, timeout=5, check=False)
-                    report['verified_serial'] = serial
-                    save()
-                    print('Подтверждено устройство выбранного LDPlayer: ' + serial, flush=True)
-                    return candidate
-            except (SetupError, OSError, subprocess.SubprocessError) as error:
-                report['last_error'] = str(error)
+                except (SetupError, OSError, subprocess.SubprocessError) as error:
+                    report['tcp_response'] = str(error)
+                online = list_local()
+            online.sort(key=lambda serial: (serial != hint, not serial.startswith('emulator-'), serial))
+            for serial in online:
+                if serial == own:
+                    continue
+                candidate = Adb(exe, serial, allow_emulator=True)
+                try:
+                    reply = candidate.shell('ls', marker, timeout=5, check=False).strip()
+                except (SetupError, subprocess.SubprocessError) as error:
+                    report['last_error'] = serial + ': ' + str(error)
+                    continue
+                if reply != marker:
+                    report['last_error'] = serial + ': устройство не подтвердило метку выбранного LDPlayer. ' + reply[-250:]
+                    continue
+                found = verified(candidate)
+                if found:
+                    return found
             save()
             if time.monotonic() >= deadline:
                 states = ', '.join(row['serial'] + '=' + row['state'] for row in report['devices']) or '(список устройств пуст)'
                 messages = ['Не удалось подтвердить ADB выбранного LDPlayer. Устройства: ' + states]
-                for label, key in (('ADB connect', 'tcp_response'), ('ldconsole adb', 'console_adb'), ('Проверка', 'last_error')):
+                for label, key in (('ADB connect', 'tcp_response'), ('ldconsole adb', 'console_adb'),
+                                   ('Обходной мост', 'bridge'), ('Проверка', 'last_error')):
                     if report.get(key):
-                        messages.append(label + ': ' + report[key][-500:])
+                        messages.append(label + ': ' + str(report[key])[-500:])
+                if not report.get('bridge'):
+                    messages.append('Обходной мост не создан: VBoxManage.exe не найден или ВМ leidian' + str(index) + ' не запущена.')
+                messages.append('Проверьте ADB в LDPlayer: Другие настройки → Отладка ADB → Локальное подключение.')
                 if diagnostic_path:
                     messages.append('Отчёт ADB: ' + str(diagnostic_path))
-                if port_reserved(port):
-                    messages.append('Порт ' + str(port) + ' зарезервирован Windows: запустите командную строку от администратора, выполните'
-                                    ' net stop winnat, netsh int ipv4 add excludedportrange protocol=tcp startport=5555 numberofports=1 store=persistent,'
-                                    ' net start winnat, затем перезапустите эмулятор.')
                 raise AdbUnavailable('\n'.join(messages))
             time.sleep(2)
     finally:
