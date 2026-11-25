@@ -58,17 +58,18 @@ class CatalogTests(unittest.TestCase):
             g1plus.select_current(session, {'key': 'selected', 'product': 'g1.2tb.ai'})
         session.checkout.assert_not_called()
 
-    def test_default_no_does_not_open_checkout(self):
+    def test_number_starts_checkout_without_extra_confirmation(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', 'n', 'q']), patch('g1plus.visit') as visit, \
+        session.checkout.return_value = {'code': 0}
+        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
-        session.checkout.assert_not_called()
-        visit.assert_not_called()
-        credit.assert_not_called()
+        session.checkout.assert_called_once_with('selected')
+        visit.assert_called_once_with()
+        credit.assert_called_once_with()
 
     def test_explicit_yes_opens_selected_offer_only(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
@@ -76,7 +77,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit, \
+        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
@@ -90,7 +91,7 @@ class CatalogTests(unittest.TestCase):
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
         session.open_store_page.return_value = 'https://play.google.com/...'
-        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit, \
+        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         visit.assert_not_called()

@@ -8,7 +8,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'dist'
-VERSION = '2.0.14'
+VERSION = '2.0.15'
 APP_FILES = (
     'billing-client.apk', 'billing.js', 'check-publisher.ps1', 'devices.py',
     'g1plus.py', 'ldplayer.py', 'mumu_mac.py', 'mumu_win.py', 'products.json',

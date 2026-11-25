@@ -15,7 +15,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.14'
+VERSION = '2.0.15'
 
 
 def load_products(path=APP / 'products.json'):
@@ -154,9 +154,6 @@ def open_offer(session, row):
     print(row['product'])
     print(describe(row))
     print('Окончательные условия и подтверждение подписки — в окне Google Play в эмуляторе.')
-    answer = input('Открыть окно оплаты в эмуляторе? [Y/n]: ').strip().lower()
-    if answer in ('n', 'no', 'н', 'нет'):
-        return
     print('Открываю окно оплаты…', flush=True)
     try:
         result = launch_checkout(session, row)
