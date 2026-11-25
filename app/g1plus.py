@@ -14,7 +14,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.10'
+VERSION = '2.0.11'
 
 
 def load_products(path=APP / 'products.json'):
@@ -80,15 +80,48 @@ def months_value(row):
     match = re.fullmatch(r'P(\d+)([YMWD])', str(first.get('period', '')))
     if not match:
         return 0.0
-    return int(match.group(1)) * {'Y': 12.0, 'M': 1.0, 'W': 0.25, 'D': 0.035}[match.group(2)]
+    days = int(match.group(1)) * {'Y': 365.0, 'M': 30.44, 'W': 7.0, 'D': 1.0}[match.group(2)]
+    cycles = int(first.get('cycles') or 1)
+    return days * cycles / 30.44
 
 
-def deal(row):
+def renewal(row):
+    phases = row.get('phases') or []
+    return phases[1] if len(phases) > 1 else {}
+
+
+def renewal_price(row):
+    return price_value({'phases': [renewal(row)]})
+
+
+def short_period(text):
+    return {'P1M': 'мес.', 'P1Y': 'год', 'P52W1D': 'год'}.get(text, period(text))
+
+
+def price_cell(row):
     first = (row.get('phases') or [{}])[0]
-    line = str(first.get('price', '—')) + ' / ' + period(str(first.get('period', '—')))
-    if first.get('cycles'):
-        line += ' × ' + str(first['cycles'])
-    return line
+    text = str(first.get('price', '—'))
+    if str(first.get('period', '')) == 'P1M':
+        return text + '/мес.'
+    if str(first.get('period', '')) in ('P1Y', 'P52W1D'):
+        return text + '/год'
+    return text
+
+
+def time_cell(row):
+    months = months_value(row)
+    if not months:
+        return period(str((row.get('phases') or [{}])[0].get('period', '—')))
+    if abs(months - round(months)) < 0.05:
+        return str(int(round(months))) + ' мес.'
+    return f'{months:.1f} мес.'
+
+
+def renew_cell(row):
+    nxt = renewal(row)
+    if not nxt or not nxt.get('price'):
+        return '—'
+    return str(nxt.get('price', '')) + '/мес.'
 
 
 def group_offers(rows):
@@ -116,38 +149,24 @@ def open_offer(session, row):
         print('Не удалось открыть вариант: ' + str(error))
 
 
-def offer_menu(session, title, items):
-    while True:
-        print(f'\n{title} — {len(items)} вариантов, лучшие сверху')
-        for number, row in enumerate(items, 1):
-            print(f"{number:3}. {row['offer']} | {deal(row)}")
-            print('     ' + describe(row))
-        print('Номер — подробнее и открыть окно; b — назад к категориям; q — выход')
-        raw = input('> ').strip()
-        if raw.lower() == 'q':
-            return 'quit'
-        if raw.lower() in ('b', ''):
-            return
-        if raw.isdigit() and 1 <= int(raw) <= len(items):
-            open_offer(session, items[int(raw) - 1])
-
-
 def interactive(session, rows, rescan):
     search = ''
     while True:
-        offers = [row for row in rows if row['offer']]
-        if not offers:
-            print('Google Play вернул только базовые тарифы: показываю их без скидок.', flush=True)
-            offers = rows
+        offers = [row for row in rows if row['offer']] or rows
         grouped = group_offers(offers)
-        titles = sorted(grouped, key=lambda title: (-len(grouped[title]), title))
+        titles = sorted(grouped, key=lambda title: (renewal_price(grouped[title][0]), title))
         if search:
             titles = [title for title in titles if search in title.lower() or any(
                 search in (row['product'] + ' ' + str(row['offer'])).lower() for row in grouped[title])]
-        print(f'\nG1 ACQ Plus — категории предложений | {len(offers)} вариантов')
-        for number, title in enumerate(titles, 1):
-            print(f'{number:3}. {title} — {len(grouped[title])}')
-        print('Номер — открыть категорию; /текст — поиск; r — обновить; q — выход')
+        table = [(title, row) for title in titles for row in grouped[title]]
+        cells = [(title, price_cell(row), time_cell(row), renew_cell(row)) for title, row in table]
+        widths = [max(len(item[column]) for item in cells) for column in range(4)]
+        widths[0] = max(widths[0], len('Подписка'))
+        print(f'\nG1 ACQ Plus — {len(table)} вариантов из Google Play\n')
+        print(f"{'№':>3}  {'Подписка':<{widths[0]}}  {'Цена':>{widths[1]}}  {'Срок':>{widths[2]}}  {'Далее':>{widths[3]}}")
+        for number, item in enumerate(cells, 1):
+            print(f'{number:3}  {item[0]:<{widths[0]}}  {item[1]:>{widths[1]}}  {item[2]:>{widths[2]}}  {item[3]:>{widths[3]}}')
+        print('\nНомер — условия и окно оформления; /текст — поиск; r — обновить; q — выход')
         raw = input('> ').strip()
         if raw.lower() == 'q':
             return
@@ -155,10 +174,8 @@ def interactive(session, rows, rescan):
             rows, search = rescan(), ''
         elif raw.startswith('/'):
             search = raw[1:].lower()
-        elif raw.isdigit() and 1 <= int(raw) <= len(titles):
-            title = titles[int(raw) - 1]
-            if offer_menu(session, title, grouped[title]) == 'quit':
-                return
+        elif raw.isdigit() and 1 <= int(raw) <= len(table):
+            open_offer(session, table[int(raw) - 1][1])
 
 
 def run_catalog(session, catalog, work, limit=None, scan_only=False):

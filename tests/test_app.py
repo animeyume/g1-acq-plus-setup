@@ -63,7 +63,7 @@ class CatalogTests(unittest.TestCase):
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', '1', '', 'b', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_not_called()
         visit.assert_not_called()
@@ -74,7 +74,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', '1', 'y', 'b', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
         visit.assert_called_once_with()
@@ -85,7 +85,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
-        with patch('builtins.input', side_effect=['1', '1', 'y', 'b', 'q']), patch('g1plus.visit') as visit:
+        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         visit.assert_not_called()
 
