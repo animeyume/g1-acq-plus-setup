@@ -144,14 +144,17 @@ def wait_installation(explicit=None, timeout=600, interval=3):
 def parse_instances(text):
     rows = {}
     for fields in csv.reader(text.lstrip('\ufeff').splitlines()):
-        if not fields:
+        if not fields or not any(field.strip() for field in fields):
             continue
-        if len(fields) not in (7, 10) or not fields[0].isdigit() or fields[4] not in ('0', '1'):
-            raise SetupError('Неожиданный ответ LDPlayer list2. Устройства не изменены.')
+        # LDPlayer builds differ in the number of trailing columns; only the
+        # index, title and running flag are meaningful here.
+        if len(fields) < 7 or not fields[0].strip().isdigit() or fields[4].strip() not in ('0', '1'):
+            raise SetupError('Неожиданный ответ LDPlayer list2: ' + ' | '.join(fields)[:300]
+                             + ' — устройства не изменены.')
         index = int(fields[0])
         if not 0 <= index < 99999 or index in rows:
             raise SetupError('Некорректный индекс устройства LDPlayer.')
-        rows[index] = {'index': index, 'name': fields[1], 'started': fields[4] == '1'}
+        rows[index] = {'index': index, 'name': fields[1], 'started': fields[4].strip() == '1'}
     return rows
 
 
@@ -170,7 +173,39 @@ class Console:
         return result.stdout.strip()
 
     def instances(self):
-        return parse_instances(self.call('list2'))
+        try:
+            return parse_instances(self.call('list2'))
+        except SetupError:
+            rows = self.alternate_instances()
+            if rows is None:
+                raise
+            return rows
+
+    def alternate_instances(self):
+        """Fallback for builds that changed the list2 column set."""
+        try:
+            names = self.call('list')
+            running = self.call('runninglist')
+        except (SetupError, OSError, subprocess.SubprocessError):
+            return None
+        rows = {}
+        for fields in csv.reader(names.lstrip('\ufeff').splitlines()):
+            if not fields or not any(field.strip() for field in fields):
+                continue
+            if len(fields) < 2 or not fields[0].strip().isdigit():
+                return None
+            index = int(fields[0])
+            if not 0 <= index < 99999 or index in rows:
+                return None
+            rows[index] = {'index': index, 'name': fields[1], 'started': False}
+        for line in running.lstrip('\ufeff').splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if not line.isdigit() or int(line) not in rows:
+                return None
+            rows[int(line)]['started'] = True
+        return rows or None
 
     def selected(self, index, command, *args):
         if index not in self.instances():
@@ -198,19 +233,28 @@ def choose(rows, requested=None):
 def wait_state(console, index, started, timeout=240):
     deadline = time.monotonic() + timeout
     next_notice = 0
+    last_error = ''
     while time.monotonic() < deadline:
         now = time.monotonic()
         if now >= next_notice:
             action = 'запуска' if started else 'остановки'
             print(f'Ожидаю {action} устройства LDPlayer {index}; осталось {max(0, int(deadline-now))} с.', flush=True)
             next_notice = now + 10
-        row = console.instances().get(index)
+        try:
+            rows = console.instances()
+        except (SetupError, OSError, subprocess.SubprocessError) as error:
+            # While the VM starts, ldconsole may answer mid-initialization.
+            last_error = str(error)
+            time.sleep(2)
+            continue
+        row = rows.get(index)
         if row is None:
             raise SetupError('Выбранное устройство LDPlayer исчезло.')
         if row['started'] == started:
             return
         time.sleep(2)
-    raise SetupError('LDPlayer не завершил запуск/остановку. Проверьте окно эмулятора и повторите запуск.')
+    detail = (' Последний ответ ldconsole: ' + last_error[-300:]) if last_error else ''
+    raise SetupError('LDPlayer не завершил запуск/остановку. Проверьте окно эмулятора и повторите запуск.' + detail)
 
 
 def reserved_tcp_ports():
@@ -357,6 +401,12 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
             candidate.connect()
         except (SetupError, subprocess.SubprocessError) as error:
             report['last_error'] = serial + ': ' + str(error)
+            if serial.startswith('127.0.0.1:'):
+                # A transport cached as "offline" never recovers on its own.
+                try:
+                    run([exe, 'disconnect', serial], timeout=10, check=False)
+                except (SetupError, OSError, subprocess.SubprocessError):
+                    pass
             return None
         report['verified_serial'] = serial
         save()

@@ -465,5 +465,80 @@ class LDPlayerBridgeTests(unittest.TestCase):
             self.assertIsNone(ldplayer.open_adb_forward(Path('ldconsole.exe'), 0))
 
 
+class LDPlayerRobustnessTests(unittest.TestCase):
+    """Different LDPlayer builds and half-started VMs must not abort the run."""
+
+    def test_list2_accepts_extra_columns(self):
+        rows = ldplayer.parse_instances('0,Main,1,2,1,100,200,1280,720,240,7,9\n1,Second,0,0,0,-1,-1\n')
+        self.assertEqual(sorted(rows), [0, 1])
+        self.assertTrue(rows[0]['started'])
+        self.assertFalse(rows[1]['started'])
+
+    def test_unexpected_list2_includes_raw_text(self):
+        with self.assertRaisesRegex(support.SetupError, 'service is starting'):
+            ldplayer.parse_instances('service is starting, try later')
+
+    def test_instances_fall_back_to_list_and_runninglist(self):
+        console = ldplayer.Console(Path('ldconsole.exe'))
+        with patch.object(console, 'call', side_effect=['garbage', '0,Main\n1,Second\n', '1\n']):
+            rows = console.instances()
+        self.assertEqual(sorted(rows), [0, 1])
+        self.assertFalse(rows[0]['started'])
+        self.assertTrue(rows[1]['started'])
+
+    def test_fallback_rejects_inconsistent_runninglist(self):
+        console = ldplayer.Console(Path('ldconsole.exe'))
+        with patch.object(console, 'call', side_effect=['garbage', '0,Main\n', '5\n']):
+            with self.assertRaisesRegex(support.SetupError, 'list2'):
+                console.instances()
+
+    def test_wait_state_survives_transient_console_errors(self):
+        clock = [0.0]
+
+        def mono():
+            clock[0] += 1.0
+            return clock[0]
+
+        console = Mock()
+        console.instances.side_effect = [support.SetupError('starting'), {0: {'started': True}}]
+        with patch('ldplayer.time.monotonic', side_effect=mono), patch('ldplayer.time.sleep'), \
+                redirect_stdout(io.StringIO()):
+            ldplayer.wait_state(console, 0, True, timeout=30)
+        self.assertEqual(console.instances.call_count, 2)
+
+    def test_wait_state_timeout_reports_last_console_answer(self):
+        clock = [0.0]
+
+        def mono():
+            clock[0] += 1.0
+            return clock[0]
+
+        console = Mock()
+        console.instances.side_effect = support.SetupError('service is starting')
+        with patch('ldplayer.time.monotonic', side_effect=mono), patch('ldplayer.time.sleep'), \
+                redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(support.SetupError, 'service is starting'):
+                ldplayer.wait_state(console, 0, True, timeout=3)
+
+    def test_offline_transport_is_disconnected_before_retry(self):
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append(list(map(str, args)))
+            return Mock(stdout='', stderr='', returncode=0)
+
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'
+            exe.touch()
+            (Path(root) / 'adb.exe').touch()
+            console = Mock(exe=exe)
+            with patch('ldplayer.open_adb_forward', return_value=15555), \
+                    patch('ldplayer.run', side_effect=fake_run), patch('ldplayer.time.sleep'), \
+                    patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                cls.return_value.connect.side_effect = [support.SetupError('device offline'), None]
+                self.assertIs(ldplayer.connect_verified(console, 0), cls.return_value)
+        self.assertIn([str(Path(root) / 'adb.exe'), 'disconnect', '127.0.0.1:15555'], calls)
+
+
 if __name__ == '__main__':
     unittest.main()
