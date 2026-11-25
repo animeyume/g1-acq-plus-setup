@@ -11,10 +11,10 @@ import traceback
 
 from support import Adb, SetupError
 from session import BillingSession, prepare_server
-from sponsor import announce
+from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.8'
+VERSION = '2.0.9'
 
 
 def load_products(path=APP / 'products.json'):
@@ -98,6 +98,7 @@ def interactive(session, rows, rescan):
                     result = session.checkout(row['key'])
                     if result['code'] == 0:
                         print('Окно Google Play открыто в эмуляторе. Скрипт подписку не подтверждает.')
+                        visit()
                     else:
                         print('Google Play отказал: ' + str(result['code']) + ' ' + result.get('message', ''))
             except Exception as error:
@@ -118,8 +119,10 @@ def run_catalog(session, catalog, work, limit=None, scan_only=False):
         return
     if not rows:
         raise SetupError('Для этого аккаунта Google Play не вернул предложения из каталога.')
-    announce()
-    input('Enter — перейти к каталогу предложений: ')
+    credit()
+    if not any(row['offer'] for row in rows):
+        print('Для этого аккаунта Google Play вернул только базовые тарифы; в меню нажмите «a».', flush=True)
+    input('Enter — открыть каталог предложений: ')
     interactive(session, rows, rescan)
 
 

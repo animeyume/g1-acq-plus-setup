@@ -21,16 +21,13 @@ def windows_command(url, checksum):
 
 
 def windows_short_command(url):
-    """Two standard statements for Windows PowerShell 5.1 and 7.
+    """One line that Windows PowerShell 5.1 runs as-is.
 
-    The installer starts with #requires, [CmdletBinding()] and param(...);
-    Windows PowerShell refuses to run that text through iex or
-    [scriptblock]::Create, so it is downloaded to a file and started with
-    -File, which parses it exactly like a normal script.
+    Start-G1.ps1 in the latest GitHub release has no param() block and no
+    [CmdletBinding()], so Invoke-Expression accepts it, and the wrapper starts
+    the real installer as a file.
     """
-    target = r'"$env:TEMP\G1AcqPlus-setup.ps1"'
-    return ("irm '" + url + "' -OutFile " + target + "; "
-            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + target)
+    return 'irm ' + url + ' | iex'
 
 
 def windows_portable_command(url, checksum):
@@ -73,8 +70,9 @@ def main():
         "curl -fL --retry 2 --proto '=https' --proto-redir '=https' '" + url + "Mac-OneClick.command' -o \"$g1_script\" && "
         "[ \"$(shasum -a 256 \"$g1_script\" | awk '{print $1}')\" = '" + mac_hash + "' ] && /bin/zsh \"$g1_script\")"
     )
-    short = windows_short_command(url + 'Windows-OneClick.ps1')
-    content = ('Windows PowerShell — две команды одной строкой (коротко):\n' + short + '\n\n'
+    release = 'https://github.com/' + args.repository + '/releases/latest/download/'
+    short = windows_short_command(release + 'Start-G1.ps1')
+    content = ('Windows PowerShell — одна строка, установщик из последнего релиза:\n' + short + '\n\n'
                'Windows cmd или PowerShell — одна строка с проверкой SHA256:\n' + windows + '\n\n'
                'Mac Terminal — одна строка:\n' + mac + '\n')
     (ROOT / 'COMMANDS.txt').write_text(content, encoding='utf-8')

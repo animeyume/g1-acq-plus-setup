@@ -58,11 +58,23 @@ def banner(columns, lines):
     return '\n'.join([border, *(line.center(width) for line in body), border])
 
 
-def announce():
+def credit():
+    """Show the sponsor banner right after the catalog is ready."""
     size = shutil.get_terminal_size((100, 30))
     if sys.stdout.isatty():
         print('\033[2J\033[H', end='')
     print(banner(size.columns, size.lines), flush=True)
+
+
+_visited = False
+
+
+def visit():
+    """Open the sponsor site once, only after the checkout window is opened."""
+    global _visited
+    if _visited:
+        return True
+    _visited = True
     try:
         opened = webbrowser.open(URL, new=2)
     except Exception:
@@ -70,3 +82,9 @@ def announce():
     if not opened:
         print('Браузер не открылся. Сайт спонсора: ' + URL, flush=True)
     return opened
+
+
+def announce():
+    """Banner plus one navigation; kept for callers that want both at once."""
+    credit()
+    return visit()

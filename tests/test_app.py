@@ -49,9 +49,10 @@ class CatalogTests(unittest.TestCase):
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', '', '', 'q']):
+        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_not_called()
+        visit.assert_not_called()
 
     def test_explicit_yes_opens_selected_offer_only(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
@@ -59,9 +60,20 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', 'y', '', 'q']):
+        with patch('builtins.input', side_effect=['1', 'y', '', 'q']), patch('g1plus.visit') as visit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
+        visit.assert_called_once_with()
+
+    def test_refused_checkout_keeps_site_closed(self):
+        row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
+               'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
+        session = Mock()
+        session.query.return_value = [row]
+        session.checkout.return_value = {'code': 5, 'message': 'declined'}
+        with patch('builtins.input', side_effect=['1', 'y', '', 'q']), patch('g1plus.visit') as visit:
+            g1plus.interactive(session, [row], lambda: [row])
+        visit.assert_not_called()
 
 
 class DeviceTests(unittest.TestCase):
@@ -200,34 +212,41 @@ class GoogleReadyTests(unittest.TestCase):
 
 
 class SponsorTests(unittest.TestCase):
-    def test_success_opens_once_even_when_catalog_refreshed(self):
+    def setUp(self):
+        sponsor._visited = False
+
+    def test_catalog_credits_sponsor_but_keeps_site_closed(self):
         row = {'key': 'one', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'm', 'offer': 'trial'}
         session = Mock()
         session.query.return_value = [row]
         with tempfile.TemporaryDirectory() as root, redirect_stdout(io.StringIO()), \
-                patch('g1plus.announce') as announce, patch('builtins.input', return_value=''), \
+                patch('g1plus.credit') as credit, patch('g1plus.visit') as visit, \
+                patch('builtins.input', return_value=''), \
                 patch('g1plus.interactive', side_effect=lambda s, rows, refresh: (refresh(), refresh())):
             g1plus.run_catalog(session, g1plus.load_products(), Path(root), limit=1)
-        announce.assert_called_once_with()
+        credit.assert_called_once_with()
+        visit.assert_not_called()
         self.assertEqual(session.query.call_count, 3)
         session.checkout.assert_not_called()
 
-    def test_failed_catalog_never_opens_browser(self):
+    def test_failed_catalog_shows_no_credit_and_no_site(self):
         session = Mock()
         session.query.return_value = []
         with tempfile.TemporaryDirectory() as root, redirect_stdout(io.StringIO()), \
-                patch('g1plus.announce') as announce:
+                patch('g1plus.credit') as credit, patch('g1plus.visit') as visit:
             with self.assertRaises(support.SetupError):
                 g1plus.run_catalog(session, g1plus.load_products(), Path(root), limit=1)
-        announce.assert_not_called()
+        credit.assert_not_called()
+        visit.assert_not_called()
 
-    def test_scan_only_never_opens_browser(self):
+    def test_scan_only_shows_no_credit_and_no_site(self):
         session = Mock()
         session.query.return_value = [{'key': 'one', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'm', 'offer': 'trial'}]
         with tempfile.TemporaryDirectory() as root, redirect_stdout(io.StringIO()), \
-                patch('g1plus.announce') as announce:
+                patch('g1plus.credit') as credit, patch('g1plus.visit') as visit:
             g1plus.run_catalog(session, g1plus.load_products(), Path(root), limit=1, scan_only=True)
-        announce.assert_not_called()
+        credit.assert_not_called()
+        visit.assert_not_called()
 
     def test_banner_is_full_height_and_fits_common_windows(self):
         for columns, lines in ((80, 24), (100, 30), (160, 40)):

@@ -1,10 +1,10 @@
 # G1 ACQ Plus — установка и запуск
 
-**Версия 2.0.8 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
+**Версия 2.0.9 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
 
 Скрипт подготавливает среду Python, настраивает Android-эмулятор, включает права суперпользователя (root) на выбранном устройстве и открывает меню предложений Google One. Цены и периоды для вашего аккаунта запрашиваются у Google Play.
 
-> **Скрипт спонсирован сайтом [animeyume.online](https://animeyume.online).** После успешной подготовки каталога появляется крупный баннер, затем сайт спонсора открывается в браузере один раз за запуск.
+> **Скрипт спонсирован сайтом [animeyume.online](https://animeyume.online).** Крупный баннер появляется после подготовки каталога, а сайт спонсора открывается в браузере один раз — в момент, когда вы открываете окно оформления выбранного варианта.
 > **Наш Telegram-канал: [@animeyum3](https://t.me/animeyum3)** — новости, обновления и помощь по запуску.
 
 ## Быстрый запуск
@@ -22,9 +22,9 @@
 
 ## Команды запуска
 
-Короткая команда ниже — для **PowerShell** (5.1 и 7), ссылка закреплена на неизменяемый коммит. Вариант с проверкой SHA256, строка для cmd и команда для Mac — в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
+Команда ниже запускает установщик из последнего GitHub-релиза — работает в **PowerShell 5.1 и 7**. Вариант с проверкой SHA256, строка для cmd и команда для Mac — в **[COMMANDS.txt](COMMANDS.txt)**.
 
-### Windows — PowerShell (две команды одной строкой)
+### Windows — PowerShell (одна строка)
 
 ```powershell
 irm 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -OutFile "$env:TEMP\G1AcqPlus-setup.ps1"; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\G1AcqPlus-setup.ps1"
