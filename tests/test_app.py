@@ -63,7 +63,7 @@ class CatalogTests(unittest.TestCase):
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
         session = Mock()
         session.query.return_value = [row]
-        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
+        with patch('builtins.input', side_effect=['1', 'n', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_not_called()
@@ -76,7 +76,7 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit, \
+        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         session.checkout.assert_called_once_with('selected')
@@ -89,11 +89,13 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = [row]
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
-        with patch('builtins.input', side_effect=['1', 'y', 'q']), patch('g1plus.visit') as visit, \
+        session.open_store_page.return_value = 'https://play.google.com/...'
+        with patch('builtins.input', side_effect=['1', '', '', 'q']), patch('g1plus.visit') as visit, \
                 patch('g1plus.credit') as credit:
             g1plus.interactive(session, [row], lambda: [row])
         visit.assert_not_called()
         credit.assert_not_called()
+        session.open_store_page.assert_called_once_with('g1.2tb.ai')
 
 
 class DeviceTests(unittest.TestCase):

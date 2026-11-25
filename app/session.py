@@ -101,6 +101,13 @@ class BillingSession:
     def checkout(self, key):
         return self.script.exports_sync.open_checkout(key)
 
+    def open_store_page(self, product):
+        """Fallback when the billing flow cannot start in the hooked process."""
+        url = ('https://play.google.com/store/account/subscriptions?sku=' + str(product)
+               + '&package=' + 'com.google.android.apps.subscriptions.red')
+        self.adb.shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', url, check=False)
+        return url
+
     def close(self):
         for target, method in ((self.script, 'unload'), (self.session, 'detach')):
             if target:

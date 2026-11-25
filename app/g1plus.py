@@ -15,7 +15,7 @@ from session import BillingSession, prepare_server
 from sponsor import credit, visit
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.13'
+VERSION = '2.0.14'
 
 
 def load_products(path=APP / 'products.json'):
@@ -134,21 +134,44 @@ def group_offers(rows):
     return groups
 
 
-def open_offer(session, row):
+def launch_checkout(session, row):
+    """Start the Google Play payment sheet, refreshing the offer token if needed."""
     try:
-        row = select_current(session, row)
-        print('\n' + row['title'] + '\n' + row['product'] + '\n' + describe(row))
-        print('Окончательные условия и подтверждение подписки — в окне Google Play в эмуляторе.')
-        if input('Открыть окно оформления этого варианта? [y/N]: ').strip().lower() in ('y', 'yes', 'д', 'да'):
-            result = session.checkout(row['key'])
-            if result['code'] == 0:
-                print('Окно Google Play открыто в эмуляторе. Скрипт подписку не подтверждает.')
-                credit()
-                visit()
-            else:
-                print('Google Play отказал: ' + str(result['code']) + ' ' + result.get('message', ''))
+        fresh = select_current(session, row)
     except Exception as error:
-        print('Не удалось открыть вариант: ' + str(error))
+        print('Не удалось обновить вариант (' + str(error) + '), пробую с сохранённым ключом.', flush=True)
+        fresh = row
+    try:
+        return session.checkout(fresh['key'])
+    except Exception as error:
+        print('Окно оплаты не открылось: ' + str(error) + '. Обновляю вариант и повторяю.', flush=True)
+        fresh = select_current(session, row)
+        return session.checkout(fresh['key'])
+
+
+def open_offer(session, row):
+    print('\nВыбран вариант: ' + row['title'] + ' — ' + price_cell(row) + ', ' + time_cell(row))
+    print(row['product'])
+    print(describe(row))
+    print('Окончательные условия и подтверждение подписки — в окне Google Play в эмуляторе.')
+    answer = input('Открыть окно оплаты в эмуляторе? [Y/n]: ').strip().lower()
+    if answer in ('n', 'no', 'н', 'нет'):
+        return
+    print('Открываю окно оплаты…', flush=True)
+    try:
+        result = launch_checkout(session, row)
+    except Exception as error:
+        print('Не удалось открыть окно оплаты: ' + str(error), flush=True)
+        result = {'code': -1, 'message': str(error)}
+    if result.get('code') == 0:
+        print('Окно оплаты открыто в эмуляторе. Переключитесь в окно LDPlayer. Скрипт подписку не подтверждает.', flush=True)
+        credit()
+        visit()
+    else:
+        url = session.open_store_page(row['product'])
+        print('Google Play не открыл окно: код ' + str(result.get('code')) + ' ' + str(result.get('message', '')), flush=True)
+        print('Открыл страницу подписки в Play внутри эмулятора: ' + str(url), flush=True)
+    input('Enter — вернуться к таблице: ')
 
 
 def interactive(session, rows, rescan):
