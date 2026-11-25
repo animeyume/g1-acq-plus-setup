@@ -474,6 +474,12 @@ class LDPlayerRobustnessTests(unittest.TestCase):
         self.assertTrue(rows[0]['started'])
         self.assertFalse(rows[1]['started'])
 
+    def test_running_status_two_is_running(self):
+        rows = ldplayer.parse_instances('0,Main,0,0,2,-1,-1\n1,Second,0,0,1,10,20\n2,Third,0,0,0,-1,-1\n')
+        self.assertTrue(rows[0]['started'])
+        self.assertTrue(rows[1]['started'])
+        self.assertFalse(rows[2]['started'])
+
     def test_unexpected_list2_includes_raw_text(self):
         with self.assertRaisesRegex(support.SetupError, 'service is starting'):
             ldplayer.parse_instances('service is starting, try later')

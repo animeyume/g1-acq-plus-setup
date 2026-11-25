@@ -1,4 +1,4 @@
-G1 ACQ Plus — версия 2.0.5
+G1 ACQ Plus — версия 2.0.6
 Windows 10/11 x64 Intel/AMD и macOS Apple Silicon (M1 и новее)
 Windows: LDPlayer 9 (64-бит, Android 9). Mac: MuMu.
 Спонсор скрипта: https://animeyume.online

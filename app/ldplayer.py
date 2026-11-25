@@ -147,14 +147,16 @@ def parse_instances(text):
         if not fields or not any(field.strip() for field in fields):
             continue
         # LDPlayer builds differ in the number of trailing columns; only the
-        # index, title and running flag are meaningful here.
-        if len(fields) < 7 or not fields[0].strip().isdigit() or fields[4].strip() not in ('0', '1'):
+        # index, title and running flag are meaningful here. LDPlayer 9 reports
+        # 2 for a running instance, older builds report 1.
+        status = fields[4].strip() if len(fields) > 4 else ''
+        if len(fields) < 7 or not fields[0].strip().isdigit() or not status.isdigit():
             raise SetupError('Неожиданный ответ LDPlayer list2: ' + ' | '.join(fields)[:300]
                              + ' — устройства не изменены.')
-        index = int(fields[0])
+        index = int(fields[0].strip())
         if not 0 <= index < 99999 or index in rows:
             raise SetupError('Некорректный индекс устройства LDPlayer.')
-        rows[index] = {'index': index, 'name': fields[1], 'started': fields[4].strip() == '1'}
+        rows[index] = {'index': index, 'name': fields[1], 'started': status != '0'}
     return rows
 
 
