@@ -26,13 +26,13 @@
 ### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-{{WINDOWS_COMMAND}}
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/f2da5490f63033d6485fdf1152e78a13816e2bc8/Windows-OneClick.ps1' -OutFile ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -ErrorAction Stop; if(-not (Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf)){throw 'Download did not create a file'}; if((Get-FileHash -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Algorithm SHA256 -ErrorAction Stop).Hash -ne '62d8d9792d5d48622fc316abbc5f06b02815e11f0250629d200c002e7bf86729'){throw 'Checksum mismatch'}; . ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))); exit (Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue) } finally { if(Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf){Remove-Item -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Force -ErrorAction SilentlyContinue} }"
 ```
 
 ### Mac — Terminal
 
 ```zsh
-{{MAC_COMMAND}}
+(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/f2da5490f63033d6485fdf1152e78a13816e2bc8/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = 'ee14259642513e86407f11b9895a5a9b6d39de8c806624c04d75fab148cacfcf' ] && /bin/zsh "$g1_script")
 ```
 
 ### Запуск Windows из архива
