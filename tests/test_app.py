@@ -345,14 +345,25 @@ class LDPlayerTests(unittest.TestCase):
                 self.assertIsNone(ldplayer.wait_installation(exe, timeout=5, interval=3))
                 cls.assert_not_called()
 
-    def test_adb_can_be_enabled_and_retried_without_restarting_script(self):
+    def test_adb_failure_relaunches_device_without_prompting(self):
         expected = Mock()
+        console = Mock()
         with patch('ldplayer.connect_verified', side_effect=[ldplayer.AdbUnavailable('disabled'), expected]) as connect, \
-                patch('builtins.input', return_value='') as prompt, redirect_stdout(io.StringIO()):
-            console = Mock()
+                patch('builtins.input') as prompt, redirect_stdout(io.StringIO()):
             self.assertIs(ldplayer.connect_interactive(console, 4), expected)
         self.assertEqual(connect.call_count, 2)
-        prompt.assert_called_once()
+        console.selected.assert_called_once_with(4, 'launch')
+        prompt.assert_not_called()
+
+    def test_adb_prompts_only_after_relaunch_also_fails(self):
+        expected = Mock()
+        console = Mock()
+        with patch('ldplayer.connect_verified',
+                   side_effect=[ldplayer.AdbUnavailable('a'), ldplayer.AdbUnavailable('b'), expected]) as connect, \
+                patch('builtins.input', return_value='') as prompt, redirect_stdout(io.StringIO()):
+            self.assertIs(ldplayer.connect_interactive(console, 4), expected)
+        self.assertEqual(connect.call_count, 3)
+        self.assertEqual(prompt.call_count, 1)
 
     def test_adb_retry_does_not_hide_wrong_device_mapping(self):
         with patch('ldplayer.connect_verified', side_effect=support.SetupError('wrong device')), \
@@ -361,13 +372,39 @@ class LDPlayerTests(unittest.TestCase):
                 ldplayer.connect_interactive(Mock(), 4)
         prompt.assert_not_called()
 
-    def test_adb_wait_can_be_cancelled_without_touching_devices(self):
+    def test_adb_wait_can_be_cancelled_without_destructive_commands(self):
         console = Mock()
         with patch('ldplayer.connect_verified', side_effect=ldplayer.AdbUnavailable('disabled')), \
                 patch('builtins.input', return_value='q'), redirect_stdout(io.StringIO()):
             with self.assertRaises(support.SetupError):
                 ldplayer.connect_interactive(console, 4)
-        console.selected.assert_not_called()
+        used = [call.args[1] for call in console.selected.call_args_list]
+        self.assertNotIn('quit', used)
+        self.assertNotIn('modify', used)
+
+    def test_start_instance_relaunches_after_invalid_client_class(self):
+        console = Mock()
+        with patch('ldplayer.wait_state', side_effect=[support.SetupError('timeout'), None]) as wait, \
+                patch('ldplayer.time.sleep'), redirect_stdout(io.StringIO()):
+            ldplayer.start_instance(console, 0)
+        self.assertEqual(console.selected.call_count, 2)
+        self.assertEqual(wait.call_count, 2)
+
+    def test_start_instance_gives_repair_hint_after_three_attempts(self):
+        console = Mock()
+        with patch('ldplayer.wait_state', side_effect=support.SetupError('нет устройства')), \
+                patch('ldplayer.time.sleep'), redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(support.SetupError, 'Исправить'):
+                ldplayer.start_instance(console, 0)
+        self.assertEqual(console.selected.call_count, 3)
+
+    def test_start_instance_survives_failed_launch_command(self):
+        console = Mock()
+        console.selected.side_effect = [support.SetupError('COM error'), '', '']
+        with patch('ldplayer.wait_state', return_value=None) as wait, \
+                patch('ldplayer.time.sleep'), redirect_stdout(io.StringIO()):
+            ldplayer.start_instance(console, 0)
+        self.assertEqual(wait.call_count, 1)
 
     def test_console_timeout_has_actionable_error(self):
         with patch('ldplayer.subprocess.run', side_effect=subprocess.TimeoutExpired('ldconsole', 15)):

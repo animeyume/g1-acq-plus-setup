@@ -360,6 +360,31 @@ def parse_adb_devices(text):
     return result
 
 
+def start_instance(console, index, attempts=3):
+    """LDPlayer 9.5 sometimes fails the first launch with InvalidClientClass."""
+    last_error = ''
+    for attempt in range(1, attempts + 1):
+        try:
+            console.selected(index, 'launch')
+        except (SetupError, OSError, subprocess.SubprocessError) as error:
+            last_error = str(error)
+            print('Команда запуска LDPlayer не сработала: ' + last_error[-300:], flush=True)
+            time.sleep(3)
+            continue
+        try:
+            wait_state(console, index, True, timeout=90 if attempt == 1 else 240)
+            return
+        except SetupError as error:
+            last_error = str(error)
+            if attempt == attempts:
+                break
+            print('Устройство не стартовало (у LDPlayer 9 бывает ошибка COM InvalidClientClass). Повторяю запуск…', flush=True)
+            time.sleep(3)
+    detail = (' Ответ LDPlayer: ' + last_error[-300:]) if last_error else ''
+    raise SetupError('LDPlayer не запустил выбранное устройство после ' + str(attempts)
+                     + ' попыток. Нажмите «Исправить» в LDPlayer и повторите запуск.' + detail)
+
+
 def connect_verified(console, index, timeout=90, diagnostic_path=None):
     exe = console.exe.parent / 'adb.exe'
     if not exe.is_file():
@@ -495,11 +520,23 @@ def connect_verified(console, index, timeout=90, diagnostic_path=None):
 def connect_interactive(console, index, work=None):
     print('Ищу фактическое локальное ADB-устройство выбранного LDPlayer…', flush=True)
     diagnostic_path = Path(work) / 'adb-diagnostic.json' if work else None
+    relaunched = False
+    timeout = 30
     while True:
         try:
-            return connect_verified(console, index, timeout=30, diagnostic_path=diagnostic_path)
+            return connect_verified(console, index, timeout=timeout, diagnostic_path=diagnostic_path)
         except AdbUnavailable as error:
             print(str(error), flush=True)
+            if not relaunched:
+                # A stuck VM is often cured by the documented relaunch.
+                relaunched = True
+                print('ADB не появился: повторяю запуск устройства (помогает при ошибке COM InvalidClientClass).', flush=True)
+                try:
+                    console.selected(index, 'launch')
+                except (SetupError, OSError, subprocess.SubprocessError) as launch_error:
+                    print('Повторный запуск не удался: ' + str(launch_error)[-300:], flush=True)
+                timeout = 180
+                continue
             print('Оставьте выбранное Android-устройство запущенным. Настройка ADB в LDPlayer: Open local connection.', flush=True)
             if input('Enter — заново найти устройство в этом запуске; Q — выйти: ').strip().lower() == 'q':
                 raise SetupError('Проверка ADB остановлена пользователем.') from error
@@ -532,8 +569,7 @@ def prepare(work, manager=None, instance=None):
     index = choose(console.instances(), instance)
     row = console.instances()[index]
     if not row['started']:
-        console.selected(index, 'launch')
-        wait_state(console, index, True)
+        start_instance(console, index)
     adb = connect_interactive(console, index, work)
     print('Проверяю права root выбранного устройства…', flush=True)
     if not adb.root():
@@ -544,8 +580,7 @@ def prepare(work, manager=None, instance=None):
         console.selected(index, 'quit')
         wait_state(console, index, False, timeout=60)
         console.selected(index, 'modify', '--root', 1)
-        console.selected(index, 'launch')
-        wait_state(console, index, True)
+        start_instance(console, index)
         adb = connect_interactive(console, index, work)
         if not adb.root():
             input('В настройках LDPlayer включите ROOT, перезапустите выбранное устройство и нажмите Enter: ')

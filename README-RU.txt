@@ -1,7 +1,8 @@
-G1 ACQ Plus — версия 2.0.6
+G1 ACQ Plus — версия 2.0.7
 Windows 10/11 x64 Intel/AMD и macOS Apple Silicon (M1 и новее)
 Windows: LDPlayer 9 (64-бит, Android 9). Mac: MuMu.
 Спонсор скрипта: https://animeyume.online
+Telegram-канал: https://t.me/animeyum3
 
 Это Android-адаптация опубликованного каталога Dgkncn/g1-acq-plus.
 Оригинальный sgmodule для iOS/Shadowrocket напрямую в Android не запускается.
@@ -77,6 +78,14 @@ LDPlayer не нужна: правило создано на выбранной 
 подключении. Если 15555 занят другим правилом, берётся следующий свободный.
 Если VBoxManage.exe не найден, скрипт использует штатный мост LDPlayer,
 а причину пишет в adb-diagnostic.json.
+
+ЕСЛИ УСТРОЙСТВО НЕ СТАРТУЕТ
+У LDPlayer 9.5 первый запуск иногда заканчивается ошибкой COM
+InvalidClientClass: окно есть, Android не загрузился, adb devices пуст.
+Скрипт повторяет ldconsole launch до трёх раз (90 с, затем по 240 с), а если
+ADB не появился — делает ещё один запуск и ждёт до 180 с.
+Если не помогло, скрипт подскажет кнопку «Исправить» в LDPlayer.
+Правка реестра и UUID виртуального диска не нужна.
 
 ЭТАПЫ В ТЕРМИНАЛЕ
 [1/3] — Python и зависимости.
