@@ -135,6 +135,70 @@ class DeviceTests(unittest.TestCase):
             self.assertEqual(mumu_win.find_manager(root), path.resolve())
 
 
+class GoogleReadyTests(unittest.TestCase):
+    """The Google Play gate must survive odd ROM output and say what is missing."""
+
+    def adb(self, root):
+        exe = Path(root) / 'adb.exe'
+        exe.touch()
+        return support.Adb(exe, '127.0.0.1:15555')
+
+    def test_account_found_in_plain_dumpsys(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            with patch.object(adb, 'shell', return_value='Accounts: 1\n  Account {name=user@gmail.com, type=com.google}'):
+                self.assertTrue(adb.account_ready())
+
+    def test_account_falls_back_to_su_variant(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            replies = ['', '', 'Account {name=user@gmail.com, type=com.google}']
+            with patch.object(adb, 'shell', side_effect=replies):
+                found, text = adb.account_dump()
+            self.assertTrue(found)
+            self.assertIn('user@gmail.com', text)
+
+    def test_missing_account_reports_raw_answer(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            with patch.object(adb, 'shell', return_value='Accounts: 0'):
+                found, text = adb.account_dump()
+            self.assertFalse(found)
+            self.assertIn('Accounts: 0', text)
+
+    def test_package_found_through_pm_list_variant(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            replies = ['', '', 'package:com.google.android.apps.subscriptions.red\npackage:com.android.vending']
+            with patch.object(adb, 'shell', side_effect=replies):
+                found = adb.package_paths()
+            self.assertIn('subscriptions.red', found)
+
+    def test_prepare_google_returns_when_both_found(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            with patch.object(adb, 'account_dump', return_value=(True, 'Account {type=com.google}')), \
+                    patch.object(adb, 'package_paths', return_value='package:/data/app/x/base.apk'), \
+                    patch('builtins.input') as prompt, redirect_stdout(io.StringIO()):
+                adb.prepare_google()
+            prompt.assert_not_called()
+
+    def test_prepare_google_prints_missing_piece(self):
+        with tempfile.TemporaryDirectory() as root:
+            adb = self.adb(root)
+            output = io.StringIO()
+            with patch.object(adb, 'account_dump', return_value=(False, 'Accounts: 0')), \
+                    patch.object(adb, 'package_paths', return_value='package:com.google.android.apps.subscriptions.red'), \
+                    patch.object(adb, 'shell', return_value=''), \
+                    patch('builtins.input', side_effect=['', 'q']), \
+                    redirect_stdout(output):
+                with self.assertRaises(support.SetupError):
+                    adb.prepare_google()
+            text = output.getvalue()
+            self.assertIn('аккаунт Google НЕ найден', text)
+            self.assertIn('Google One установлен', text)
+
+
 class SponsorTests(unittest.TestCase):
     def test_success_opens_once_even_when_catalog_refreshed(self):
         row = {'key': 'one', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'm', 'offer': 'trial'}

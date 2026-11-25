@@ -116,23 +116,66 @@ class Adb:
                 pass
         return False
 
+    def account_dump(self):
+        """Return (signed-in Google account found, accounts text)."""
+        last = ''
+        for parts in (('dumpsys', 'account'), ('dumpsys', 'account', '--user', '0'),
+                      ('su', '-c', 'dumpsys account'), ('su', '-c', 'dumpsys account --user 0')):
+            try:
+                text = self.shell(*parts, check=False)
+            except (SetupError, subprocess.SubprocessError):
+                continue
+            last = text or last
+            accounts = [line.strip() for line in text.splitlines() if 'Account {' in line]
+            if any(re.search(r'type=com\.google', line) for line in accounts):
+                return True, '\n'.join(accounts)
+        return False, last
+
     def account_ready(self):
-        for parts in (('dumpsys', 'account'), ('su', '-c', 'dumpsys account')):
-            text = self.shell(*parts, check=False)
-            if re.search(r'Account \{name=[^,}]+,\s*type=com\.google', text):
-                return True
-        return False
+        return self.account_dump()[0]
+
+    def package_paths(self):
+        """Locate Google One even when the build reports a variant package id."""
+        for parts in (('pm', 'path', PKG), ('su', '-c', 'pm path ' + PKG)):
+            try:
+                text = self.shell(*parts, check=False)
+            except (SetupError, subprocess.SubprocessError):
+                continue
+            if 'package:' in text:
+                return text.strip()
+        try:
+            text = self.shell('pm', 'list', 'packages', check=False)
+        except (SetupError, subprocess.SubprocessError):
+            return ''
+        matches = [line.strip() for line in text.splitlines()
+                   if PKG in line or 'com.google.android.apps.subscriptions' in line]
+        return '\n'.join(matches)
 
     def package_ready(self):
-        return 'package:' in self.shell('pm', 'path', PKG, check=False)
+        return bool(self.package_paths())
 
     def prepare_google(self):
         if self.account_ready() and self.package_ready():
             return
         self.shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'market://details?id=' + PKG,
                    '-p', 'com.android.vending', check=False)
-        while not (self.account_ready() and self.package_ready()):
-            print('В эмуляторе войдите в Google Play, установите Google One и откройте его один раз.')
+        attempt = 0
+        while True:
+            attempt += 1
+            account, accounts = self.account_dump()
+            package = self.package_paths()
+            if account and package:
+                print('Google Play: аккаунт найден, Google One установлен.', flush=True)
+                return
+            print('Проверка ' + str(attempt) + ' (ADB ' + self.serial + '): аккаунт Google '
+                  + ('найден' if account else 'НЕ найден') + ', Google One '
+                  + ('установлен' if package else 'НЕ установлен') + '.', flush=True)
+            if not account:
+                detail = ' | '.join(accounts.splitlines()[-4:]) if accounts else 'dumpsys account вернул пустой ответ'
+                print('  Аккаунты: ' + detail[:300], flush=True)
+            if not package:
+                print('  Пакет ' + PKG + ' не найден ни через pm path, ни через pm list packages.', flush=True)
+            print('В эмуляторе войдите в Google Play, установите Google One и откройте его один раз.', flush=True)
             if input('Enter — проверить снова; Q — выйти: ').strip().lower() == 'q':
                 raise SetupError('Остановлено пользователем.')
 

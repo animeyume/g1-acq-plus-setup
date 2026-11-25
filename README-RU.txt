@@ -1,4 +1,4 @@
-G1 ACQ Plus — версия 2.0.7
+G1 ACQ Plus — версия 2.0.8
 Windows 10/11 x64 Intel/AMD и macOS Apple Silicon (M1 и новее)
 Windows: LDPlayer 9 (64-бит, Android 9). Mac: MuMu.
 Спонсор скрипта: https://animeyume.online
@@ -86,6 +86,12 @@ InvalidClientClass: окно есть, Android не загрузился, adb de
 ADB не появился — делает ещё один запуск и ждёт до 180 с.
 Если не помогло, скрипт подскажет кнопку «Исправить» в LDPlayer.
 Правка реестра и UUID виртуального диска не нужна.
+
+ПРОВЕРКА GOOGLE PLAY НА ШАГЕ 3.2
+Скрипт печатает, что именно не найдено: аккаунт Google или пакет
+Google One (учитываются варианты com.google.android.apps.subscriptions.*
+и несколько пользователей Android). Если аккаунт есть, а пакета нет —
+открывается страница Google One в Google Play.
 
 ЭТАПЫ В ТЕРМИНАЛЕ
 [1/3] — Python и зависимости.
