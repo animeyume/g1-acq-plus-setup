@@ -8,7 +8,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'dist'
-VERSION = '2.0.0'
+VERSION = '2.0.1'
 APP_FILES = (
     'billing-client.apk', 'billing.js', 'check-publisher.ps1', 'devices.py',
     'g1plus.py', 'ldplayer.py', 'mumu_mac.py', 'mumu_win.py', 'products.json',
@@ -96,8 +96,9 @@ def local_windows_bundle():
         'Запуск G1 ACQ Plus на Windows\r\n\r\n'
         '1. Скопируйте ZIP на Windows-ПК и извлеките ВСЕ файлы в одну папку.\r\n'
         '2. Запустите START.cmd.\r\n'
-        '3. Если LDPlayer не установлен, установите его с открывшейся\r\n'
-        '   партнёрской страницы и вернитесь в скрипт.\r\n\r\n'
+        '3. Если LDPlayer не установлен, на открывшейся партнёрской\r\n'
+        '   странице выберите LDPlayer 9 (64-бит, Android 9), установите\r\n'
+        '   его и вернитесь в скрипт.\r\n\r\n'
         'Файл Windows-OneClick.ps1 содержит исходники и BillingClient DEX.\r\n'
         'Для загрузки Python, зависимостей и эмулятора требуется Интернет.\r\n'
         'Спонсор: https://animeyume.online\r\n'

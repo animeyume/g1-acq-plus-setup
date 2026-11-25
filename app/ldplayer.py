@@ -173,15 +173,16 @@ def connect_verified(console, index, timeout=90):
 
 
 def prepare(work, manager=None, instance=None):
+    print('Для этой сборки выбирайте LDPlayer 9: 64-битная версия на Android 9.')
     path = find_console(manager)
     if not path:
         print('Открываю официальную партнёрскую страницу загрузки LDPlayer: ' + REFERRAL_URL)
-        print('Загрузите и установите LDPlayer в браузере. Партнёрская ссылка может приносить автору комиссию.')
+        print('На странице загрузки выберите LDPlayer 9. LDPlayer 14 — бета-версия; для этой сборки рекомендуем 9.')
         try:
             webbrowser.open(REFERRAL_URL, new=2)
         except Exception:
             pass
-        input('После установки и первого запуска LDPlayer нажмите Enter: ')
+        input('После установки и первого запуска LDPlayer 9 нажмите Enter: ')
         path = find_console()
         if not path:
             path = find_console(input('Полный путь к папке LDPlayer или ldconsole.exe: ').strip())

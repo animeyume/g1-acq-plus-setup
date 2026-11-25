@@ -1,4 +1,5 @@
-Catalog and advertised targets: Dgkncn/g1-acq-plus at c9c91e8e4e315edf62d949e0fe33e30502559218
-BillingClient 5.2.1 DEX: user-provided Gemini.zip/module_b64.py
-Application and installers: rewritten for this task.
-No offer/purchase tokens from the third-party catalog are included.
+Каталог и дополнительные идентификаторы: Dgkncn/g1-acq-plus, коммит c9c91e8e4e315edf62d949e0fe33e30502559218.
+Исходный проект каталога: crhywun/g1-acq.
+BillingClient 5.2.1 DEX: module_b64.py из предоставленного пользователем архива Gemini.zip.
+Приложение и установщики написаны заново для этой сборки.
+Токены предложений и покупок из стороннего каталога не включены.

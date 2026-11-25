@@ -14,7 +14,7 @@ from session import BillingSession, prepare_server
 from sponsor import announce
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.0'
+VERSION = '2.0.1'
 
 
 def load_products(path=APP / 'products.json'):
@@ -158,6 +158,7 @@ def main():
         return 0
     if args.limit is not None and args.limit < 1:
         raise SetupError('--limit должен быть положительным.')
+    print('[3.1] Подготовка эмулятора и проверка Android root…', flush=True)
     if args.serial:
         if not args.adb:
             raise SetupError('Для --serial укажите точный путь --adb.')
@@ -168,15 +169,18 @@ def main():
         adb = prepare(work, args.manager, args.instance, args.emulator)
     if not adb.root():
         raise SetupError('Android root отсутствует.')
+    print('Android root подтверждён: uid=0.', flush=True)
+    print('[3.2] Проверка Google Play и Google One…', flush=True)
     adb.prepare_google()
+    print('[3.3] Подключение скрипта к Google One…', flush=True)
     import frida
     prepare_server(adb, work, frida.__version__)
     pid = adb.app_pid() or adb.open_google()
     catalog = load_products()
     session = BillingSession(adb, APP)
     try:
-        print('Подключаюсь к Google One…', flush=True)
         session.attach(pid)
+        print('[3.4] Получение каталога предложений Google Play…', flush=True)
         run_catalog(session, catalog, work, args.limit, args.scan_only)
     finally:
         session.close()
