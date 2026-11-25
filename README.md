@@ -1,6 +1,6 @@
 # G1 ACQ Plus — установка и запуск
 
-**Версия 2.0.1 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
+**Версия 2.0.2 · Windows 10/11 · macOS на Apple Silicon · Python 3.13**
 
 Скрипт подготавливает среду Python, настраивает Android-эмулятор, включает права суперпользователя (root) на выбранном устройстве и открывает меню предложений Google One. Цены и периоды для вашего аккаунта запрашиваются у Google Play.
 
@@ -10,12 +10,12 @@
 
 | Компьютер | Эмулятор для этой сборки | Как запустить |
 | --- | --- | --- |
-| Windows 10/11, Intel или AMD, 64-бит | **LDPlayer 9 · Android 9 · 64-бит** | Вставьте команду из раздела [«Команды запуска»](#команды-запуска) в PowerShell |
+| Windows 10/11, Intel или AMD, 64-бит | **LDPlayer 9 · Android 9 · 64-бит** | Вставьте команду из раздела [«Команды запуска»](#команды-запуска) в PowerShell или cmd |
 | Mac с процессором M1 и новее | **MuMu** | Вставьте команду для Mac в Terminal |
 
 **Какую версию LDPlayer скачивать — 9 или 14?** Выбирайте **LDPlayer 9 (64-бит, Android 9)**. На [официальном сайте](https://www.ldplayer.net/) LDPlayer 14 обозначен как бета-версия; для этой сборки рекомендуем 9.
 
-Если LDPlayer ещё не установлен, скрипт откроет [партнёрскую страницу загрузки](https://leap.ldplayer.gg/T4WsicN6b). Выберите на ней **LDPlayer 9**, завершите установку и первый запуск эмулятора, затем вернитесь в терминал и нажмите Enter.
+Если LDPlayer ещё не установлен, скрипт откроет [партнёрскую страницу загрузки](https://leap.ldplayer.gg/T4WsicN6b). Выберите на ней **LDPlayer 9**, завершите установку и первый запуск эмулятора, скрипт автоматически обнаружит консоль, ADB и первое Android-устройство. Если установка занимает больше 10 минут, можно продолжить поиск или указать папку вручную в том же запуске.
 
 Вход в Google Play, установка Google One и его первоначальная настройка выполняются в окне эмулятора. Подписку нужно подтвердить вручную в стандартном окне Google Play.
 
@@ -23,16 +23,16 @@
 
 Актуальные команды с проверкой контрольной суммы находятся в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
 
-### Windows — PowerShell
+### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-& { $ErrorActionPreference='Stop'; $g1=Join-Path $env:TEMP ('G1-'+[guid]::NewGuid()+'.ps1'); try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/3870b12d1f7117f5f7c0aba84206b19feec72903/Windows-OneClick.ps1' -OutFile $g1 -ErrorAction Stop; if(-not (Test-Path -LiteralPath $g1 -PathType Leaf)){throw 'Download did not create a file'}; if((Get-FileHash -LiteralPath $g1 -Algorithm SHA256 -ErrorAction Stop).Hash -ne '797bac16edb3c89b57ee6f05b70f3438dc222405bd3d9b50c3f2259d2d246f89'){throw 'Checksum mismatch'}; & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $g1; if($LASTEXITCODE -ne 0){throw ('Installer exited with code '+$LASTEXITCODE)} } finally { if(Test-Path -LiteralPath $g1 -PathType Leaf){Remove-Item -LiteralPath $g1 -Force -ErrorAction SilentlyContinue} } }
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/19f77b16ccae9237731da180114ffc11def01b63/Windows-OneClick.ps1' -OutFile ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -ErrorAction Stop; if(-not (Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf)){throw 'Download did not create a file'}; if((Get-FileHash -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Algorithm SHA256 -ErrorAction Stop).Hash -ne '74cf030a5bc5795af6b8d4bc3a7b189984a4850c40c6393388d8dfc3f3001e78'){throw 'Checksum mismatch'}; . ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))); exit (Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue) } finally { if(Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf){Remove-Item -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Force -ErrorAction SilentlyContinue} }"
 ```
 
 ### Mac — Terminal
 
 ```zsh
-(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/3870b12d1f7117f5f7c0aba84206b19feec72903/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = '4a93d1efed76e64327a8540d4a061b9209a19c5771ad6ba5d0749bf5e0e33205' ] && /bin/zsh "$g1_script")
+(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/19f77b16ccae9237731da180114ffc11def01b63/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = '54a7fd90eedde83209e394441ab765edcc30603cb00a31fb72a277310edbf642' ] && /bin/zsh "$g1_script")
 ```
 
 ### Запуск Windows из архива
@@ -53,6 +53,12 @@
 Пункты **3.1–3.4 входят в общий этап 3/3**. После установки эмулятора выполнение продолжается: скрипт включает root через штатную команду LDPlayer, перезапускает выбранное устройство и проверяет `su → uid=0`. При неудаче он предложит включить ROOT в настройках и повторить проверку. Без подтверждённого root загрузка каталога не начинается.
 
 После получения непустого каталога появляется баннер спонсора и открывается сайт. Нажмите Enter в терминале, чтобы перейти к меню тарифов.
+
+### Если на этапе 3.1 недоступен ADB
+
+В LDPlayer откройте **Настройки → Другие настройки → Отладка ADB → Локальное подключение** (`Settings → Other settings → ADB debugging → Open local connection`). Сохраните настройки и дождитесь перезапуска устройства, если эмулятор его запросит. Это соответствует [инструкции LDPlayer](https://www.ldplayer.net/support/how-to-solve-locked-screen.html).
+
+Скрипт показывает текущую проверку и оставшееся время. Если подключиться не удалось, **Enter повторяет проверку в том же запуске**, а `Q` завершает ожидание. Root после подключения проверяется и при необходимости включается для выбранного устройства.
 
 ## Таблицы тарифов на русском
 
@@ -149,7 +155,7 @@
 - Windows 10/11 на Intel или AMD, 64-бит; Mac на Apple Silicon M1 и новее.
 - Для отдельной среды Python требуется около 2 ГиБ свободного места; место для эмулятора проверяйте по требованиям его установщика.
 - Реально проверены установка Python 3.13.18 и зависимостей на Mac, повторный запуск из пути с пробелами и кириллицей.
-- Пройдены 27 Python-тестов, 10 проверок подключения BillingClient с имитацией Android API, 4 проверки установки среды в PowerShell и 6 проверок команды загрузки.
+- Пройдены 33 Python-теста, 10 проверок подключения BillingClient с имитацией Android API, 4 проверки установки среды в PowerShell и 12 проверок загрузки и запуска команды Windows. На безопасных тестовых файлах проверены ошибки загрузки, хеш, сохранение кода завершения и передача аргумента PowerShell. Windows cmd в текущем окружении недоступен.
 - Полная установка на Windows и полный цикл оформления Google One в LDPlayer/MuMu в текущем окружении не проверены.
 
 Подробная инструкция: **[README-RU.txt](README-RU.txt)**.
