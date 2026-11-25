@@ -22,7 +22,7 @@ def windows_command(url, checksum):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--repository', default='animeyumeAI/g1-acq-plus-setup')
+    parser.add_argument('--repository', default='animeyume/g1-acq-plus-setup')
     parser.add_argument('--commit', required=True)
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository):
