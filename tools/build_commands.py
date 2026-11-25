@@ -21,20 +21,16 @@ def windows_command(url, checksum):
 
 
 def windows_short_command(url):
-    """One short line for PowerShell or cmd; the commit in the URL pins content.
+    """Two standard statements for Windows PowerShell 5.1 and 7.
 
-    Windows PowerShell 5.1 rejects [CmdletBinding()] and param(...) when the
-    downloaded text goes straight into Invoke-Expression, so the text is turned
-    into a script block first, which is parsed in script scope.
+    The installer starts with #requires, [CmdletBinding()] and param(...);
+    Windows PowerShell refuses to run that text through iex or
+    [scriptblock]::Create, so it is downloaded to a file and started with
+    -File, which parses it exactly like a normal script.
     """
-    body = ("[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; "
-            "& ([scriptblock]::Create((irm '" + url + "' -UseBasicParsing)))")
-    if any(char in body for char in ('"', '%', '!', '\n', '\r', '$')):
-        raise ValueError('Command contains characters requiring shell-specific escaping')
-    result = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' + body + '"'
-    if len(result) >= 8191:
-        raise ValueError('Command exceeds the cmd.exe command-line limit')
-    return result
+    target = r'"$env:TEMP\G1AcqPlus-setup.ps1"'
+    return ("irm '" + url + "' -OutFile " + target + "; "
+            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + target)
 
 
 def windows_portable_command(url, checksum):
@@ -78,8 +74,8 @@ def main():
         "[ \"$(shasum -a 256 \"$g1_script\" | awk '{print $1}')\" = '" + mac_hash + "' ] && /bin/zsh \"$g1_script\")"
     )
     short = windows_short_command(url + 'Windows-OneClick.ps1')
-    content = ('Windows — PowerShell или cmd, одна строка (короткая):\n' + short + '\n\n'
-               'Windows — вариант с проверкой SHA256:\n' + windows + '\n\n'
+    content = ('Windows PowerShell — две команды одной строкой (коротко):\n' + short + '\n\n'
+               'Windows cmd или PowerShell — одна строка с проверкой SHA256:\n' + windows + '\n\n'
                'Mac Terminal — одна строка:\n' + mac + '\n')
     (ROOT / 'COMMANDS.txt').write_text(content, encoding='utf-8')
     (out / 'COMMANDS.txt').write_text(content, encoding='utf-8')

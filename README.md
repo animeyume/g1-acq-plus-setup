@@ -22,17 +22,15 @@
 
 ## Команды запуска
 
-Короткая команда ниже — для PowerShell и cmd; ссылка закреплена на неизменяемый коммит. Вариант с проверкой SHA256 и команда для Mac — в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
+Короткая команда ниже — для **PowerShell** (5.1 и 7), ссылка закреплена на неизменяемый коммит. Вариант с проверкой SHA256, строка для cmd и команда для Mac — в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
 
-### Windows — PowerShell или командная строка (cmd)
+### Windows — PowerShell (две команды одной строкой)
 
 ```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -UseBasicParsing)))"
+irm 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -OutFile "$env:TEMP\G1AcqPlus-setup.ps1"; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\G1AcqPlus-setup.ps1"
 ```
 
-> Если при копировании двойные кавычки заменились на «ёлочки» (`«…»`), PowerShell примет `{ … }` за отдельный script block и напишет `Параметр ScriptBlock следует указывать только в качестве значения параметра Command`. Вставьте команду в Блокнот и верните обычные `"` — либо используйте вариант без кавычек, который кладёт установщик в текущую папку:
->
-> `curl.exe -fsSL https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/d73a3fdb1356c8c69001d1398e3a713d207e7f73/Windows-OneClick.ps1 -o g1.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File g1.ps1`
+Для **cmd** или для одного вызова с проверкой SHA256 возьмите вторую команду из [COMMANDS.txt](COMMANDS.txt), либо скачайте [архив для Windows](G1AcqPlus-Windows-Local.zip) и запустите `START.cmd`.
 
 ### Mac — Terminal
 
