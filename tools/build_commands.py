@@ -20,6 +20,26 @@ def windows_command(url, checksum):
     )
 
 
+def windows_portable_command(url, checksum):
+    # No variable interpolation or shell operators in the surrounding shell:
+    # both cmd.exe and PowerShell pass this literal argument to powershell.exe.
+    path = "([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1')))"
+    body = (
+        "try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; "
+        "Invoke-WebRequest -UseBasicParsing '" + url + "' -OutFile " + path + " -ErrorAction Stop; "
+        "if(-not (Test-Path -LiteralPath " + path + " -PathType Leaf)){throw 'Download did not create a file'}; "
+        "if((Get-FileHash -LiteralPath " + path + " -Algorithm SHA256 -ErrorAction Stop).Hash -ne '" + checksum + "'){throw 'Checksum mismatch'}; "
+        ". " + path + "; exit (Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue) "
+        "} finally { if(Test-Path -LiteralPath " + path + " -PathType Leaf){Remove-Item -LiteralPath " + path + " -Force -ErrorAction SilentlyContinue} }"
+    )
+    if any(char in body for char in ('$', '"', '%', '!', '\n', '\r')):
+        raise ValueError('Command contains characters requiring shell-specific escaping')
+    result = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' + body + '"'
+    if len(result) >= 8191:
+        raise ValueError('Command exceeds the cmd.exe command-line limit')
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repository', default='animeyume/g1-acq-plus-setup')
@@ -33,16 +53,18 @@ def main():
     url = 'https://raw.githubusercontent.com/' + args.repository + '/' + args.commit + '/'
     win_hash = hashlib.sha256((out / 'Windows-OneClick.ps1').read_bytes()).hexdigest()
     mac_hash = hashlib.sha256((out / 'Mac-OneClick.command').read_bytes()).hexdigest()
-    windows = windows_command(url + 'Windows-OneClick.ps1', win_hash)
+    bootstrap = windows_command(url + 'Windows-OneClick.ps1', win_hash)
+    windows = windows_portable_command(url + 'Windows-OneClick.ps1', win_hash)
     mac = (
         "(g1_script=\"$(mktemp -t g1setup)\"; trap 'rm -f -- \"$g1_script\"' EXIT; "
         "curl -fL --retry 2 --proto '=https' --proto-redir '=https' '" + url + "Mac-OneClick.command' -o \"$g1_script\" && "
         "[ \"$(shasum -a 256 \"$g1_script\" | awk '{print $1}')\" = '" + mac_hash + "' ] && /bin/zsh \"$g1_script\")"
     )
-    content = 'Windows PowerShell — одна строка:\n' + windows + '\n\nMac Terminal — одна строка:\n' + mac + '\n'
+    content = 'Windows — PowerShell или cmd, одна строка:\n' + windows + '\n\nMac Terminal — одна строка:\n' + mac + '\n'
     (ROOT / 'COMMANDS.txt').write_text(content, encoding='utf-8')
     (out / 'COMMANDS.txt').write_text(content, encoding='utf-8')
-    (out / 'windows-command.ps1').write_text(windows + '\n', encoding='utf-8-sig')
+    (out / 'windows-command.ps1').write_text(bootstrap + '\n', encoding='utf-8-sig')
+    (out / 'windows-portable-command.txt').write_text(windows + '\n', encoding='ascii')
     (out / 'mac-command.zsh').write_text(mac + '\n', encoding='utf-8')
     print('Generated scoped, fail-fast download commands.')
 

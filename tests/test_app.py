@@ -233,6 +233,69 @@ class LDPlayerTests(unittest.TestCase):
     def test_referral_is_original_short_link(self):
         self.assertEqual(ldplayer.REFERRAL_URL, 'https://leap.ldplayer.gg/T4WsicN6b')
 
+    def test_installation_waits_for_registration_and_first_device(self):
+        elapsed = [0.0]
+        scans = [0]
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch()
+            def discover():
+                scans[0] += 1
+                if scans[0] == 1:
+                    return []
+                (Path(root) / 'adb.exe').touch()
+                return [exe]
+            def sleep(seconds):
+                elapsed[0] += seconds
+            with patch('ldplayer.discover_consoles', side_effect=discover), \
+                    patch('ldplayer.Console') as cls, patch('ldplayer.time.monotonic', side_effect=lambda: elapsed[0]), \
+                    patch('ldplayer.time.sleep', side_effect=sleep), patch('builtins.input') as prompt, \
+                    redirect_stdout(io.StringIO()):
+                cls.return_value.instances.side_effect = [{}, {4: {'name': 'Ready'}}]
+                self.assertEqual(ldplayer.wait_installation(timeout=30), exe)
+                cls.return_value.selected.assert_not_called()
+                prompt.assert_not_called()
+        self.assertEqual(scans[0], 3)
+
+    def test_partial_install_does_not_run_console_or_root(self):
+        elapsed = [0.0]
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch()
+            def sleep(seconds): elapsed[0] += seconds
+            with patch('ldplayer.Console') as cls, \
+                    patch('ldplayer.time.monotonic', side_effect=lambda: elapsed[0]), \
+                    patch('ldplayer.time.sleep', side_effect=sleep), redirect_stdout(io.StringIO()):
+                self.assertIsNone(ldplayer.wait_installation(exe, timeout=5, interval=3))
+                cls.assert_not_called()
+
+    def test_adb_can_be_enabled_and_retried_without_restarting_script(self):
+        expected = Mock()
+        with patch('ldplayer.connect_verified', side_effect=[ldplayer.AdbUnavailable('disabled'), expected]) as connect, \
+                patch('builtins.input', return_value='') as prompt, redirect_stdout(io.StringIO()):
+            console = Mock()
+            self.assertIs(ldplayer.connect_interactive(console, 4), expected)
+        self.assertEqual(connect.call_count, 2)
+        prompt.assert_called_once()
+
+    def test_adb_retry_does_not_hide_wrong_device_mapping(self):
+        with patch('ldplayer.connect_verified', side_effect=support.SetupError('wrong device')), \
+                patch('builtins.input') as prompt, redirect_stdout(io.StringIO()):
+            with self.assertRaises(support.SetupError):
+                ldplayer.connect_interactive(Mock(), 4)
+        prompt.assert_not_called()
+
+    def test_adb_wait_can_be_cancelled_without_touching_devices(self):
+        console = Mock()
+        with patch('ldplayer.connect_verified', side_effect=ldplayer.AdbUnavailable('disabled')), \
+                patch('builtins.input', return_value='q'), redirect_stdout(io.StringIO()):
+            with self.assertRaises(support.SetupError):
+                ldplayer.connect_interactive(console, 4)
+        console.selected.assert_not_called()
+
+    def test_console_timeout_has_actionable_error(self):
+        with patch('ldplayer.subprocess.run', side_effect=subprocess.TimeoutExpired('ldconsole', 15)):
+            with self.assertRaisesRegex(support.SetupError, '15 с'):
+                ldplayer.Console('ldconsole.exe').instances()
+
 
 if __name__ == '__main__':
     unittest.main()

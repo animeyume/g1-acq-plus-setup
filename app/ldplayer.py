@@ -14,6 +14,10 @@ from support import Adb, SetupError
 REFERRAL_URL = 'https://leap.ldplayer.gg/T4WsicN6b'
 
 
+class AdbUnavailable(SetupError):
+    pass
+
+
 def resolve_console(raw):
     folder = Path(os.path.expandvars(str(raw).strip().strip('"')))
     for path in (folder, folder / 'ldconsole.exe', folder / 'dnconsole.exe'):
@@ -55,12 +59,25 @@ def registry_folders():
     return result
 
 
-def find_console(explicit=None):
-    if explicit:
-        result = resolve_console(explicit)
-        if not result:
-            raise SetupError('ldconsole.exe не найден по указанному пути: ' + str(explicit))
-        return result
+def process_folders():
+    if os.name != 'nt':
+        return []
+    script = ("$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process "
+              "-Filter \"Name = 'dnplayer.exe' OR Name = 'LDPlayer.exe' OR Name = 'ldmultiplayer.exe'\" "
+              "| Select-Object -ExpandProperty ExecutablePath | ConvertTo-Json -Compress")
+    try:
+        result = subprocess.run(['powershell.exe', '-NoLogo', '-NoProfile', '-Command', script],
+                                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=8)
+        if result.returncode or not result.stdout.strip():
+            return []
+        data = json.loads(result.stdout.lstrip('\ufeff'))
+        return [str(Path(value).parent) for value in (data if isinstance(data, list) else [data])
+                if isinstance(value, str) and value]
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return []
+
+
+def discover_consoles():
     candidates = registry_folders()
     for base in (os.environ.get('ProgramFiles'), os.environ.get('ProgramFiles(x86)'),
                  os.environ.get('LOCALAPPDATA'), 'C:/', 'D:/'):
@@ -69,6 +86,12 @@ def find_console(explicit=None):
                             'Changzhi/LDPlayer', 'leidian/LDPlayer9', 'leidian/LDPlayer14'):
                 candidates.append(str(Path(base) / product))
     found = list(dict.fromkeys(path for raw in candidates if (path := resolve_console(raw))))
+    if not found:
+        found = list(dict.fromkeys(path for raw in process_folders() if (path := resolve_console(raw))))
+    return found
+
+
+def choose_console(found):
     if len(found) == 1:
         return found[0]
     if len(found) > 1:
@@ -80,6 +103,42 @@ def find_console(explicit=None):
             if selected.isdigit() and 1 <= int(selected) <= len(found):
                 return found[int(selected) - 1]
     return None
+
+
+def find_console(explicit=None):
+    if explicit:
+        result = resolve_console(explicit)
+        if not result:
+            raise SetupError('ldconsole.exe не найден по указанному пути: ' + str(explicit))
+        return result
+    return choose_console(discover_consoles())
+
+
+def wait_installation(explicit=None, timeout=600, interval=3):
+    deadline = time.monotonic() + timeout
+    next_notice = 0
+    while True:
+        now = time.monotonic()
+        if now >= next_notice:
+            print(f'Ожидаю LDPlayer: консоль, ADB и первое Android-устройство; осталось {max(0, int(deadline-now))} с.', flush=True)
+            next_notice = now + 10
+        candidates = [Path(explicit)] if explicit else discover_consoles()
+        ready = []
+        for path in candidates:
+            if not (path.parent / 'adb.exe').is_file():
+                continue
+            try:
+                if Console(path).instances():
+                    ready.append(path)
+            except (SetupError, OSError, subprocess.SubprocessError):
+                continue
+        if ready:
+            result = choose_console(ready)
+            print('LDPlayer найден и готов: ' + str(result), flush=True)
+            return result
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(interval)
 
 
 def parse_instances(text):
@@ -101,8 +160,11 @@ class Console:
         self.exe = Path(path)
 
     def call(self, *args):
-        result = subprocess.run([str(self.exe), *map(str, args)], cwd=self.exe.parent,
-                                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
+        try:
+            result = subprocess.run([str(self.exe), *map(str, args)], cwd=self.exe.parent,
+                                    capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15)
+        except subprocess.TimeoutExpired as error:
+            raise SetupError('LDPlayer не ответил на команду ' + str(args[0]) + ' за 15 с. Проверьте окно эмулятора.') from error
         if result.returncode:
             raise SetupError('LDPlayer: ' + (result.stderr or result.stdout)[-700:])
         return result.stdout.strip()
@@ -135,7 +197,13 @@ def choose(rows, requested=None):
 
 def wait_state(console, index, started, timeout=240):
     deadline = time.monotonic() + timeout
+    next_notice = 0
     while time.monotonic() < deadline:
+        now = time.monotonic()
+        if now >= next_notice:
+            action = 'запуска' if started else 'остановки'
+            print(f'Ожидаю {action} устройства LDPlayer {index}; осталось {max(0, int(deadline-now))} с.', flush=True)
+            next_notice = now + 10
         row = console.instances().get(index)
         if row is None:
             raise SetupError('Выбранное устройство LDPlayer исчезло.')
@@ -154,13 +222,18 @@ def connect_verified(console, index, timeout=90):
         raise SetupError('Индекс LDPlayer выходит за диапазон локальных портов.')
     adb = Adb(exe, f'127.0.0.1:{port}')
     deadline = time.monotonic() + timeout
+    next_notice = 0
     while True:
+        now = time.monotonic()
+        if now >= next_notice:
+            print(f'Проверяю локальный ADB {adb.serial} и загрузку Android; осталось {max(0, int(deadline-now))} с.', flush=True)
+            next_notice = now + 10
         try:
             adb.connect()
             break
         except (SetupError, subprocess.SubprocessError):
             if time.monotonic() >= deadline:
-                raise SetupError('Локальный ADB LDPlayer недоступен. В настройках включите ADB для локального подключения.')
+                raise AdbUnavailable('Локальный ADB LDPlayer недоступен. В настройках включите ADB для локального подключения.')
             time.sleep(2)
     # Prove the documented index-to-port mapping with a fresh marker through
     # the vendor console before executing root commands over this ADB socket.
@@ -172,8 +245,21 @@ def connect_verified(console, index, timeout=90):
     return adb
 
 
+def connect_interactive(console, index):
+    print('ADB в настройках LDPlayer: Другие настройки → Отладка ADB → Локальное подключение.', flush=True)
+    while True:
+        try:
+            return connect_verified(console, index, timeout=30)
+        except AdbUnavailable as error:
+            print(str(error), flush=True)
+            print('Выберите Open local connection, сохраните настройки и дождитесь перезапуска устройства.', flush=True)
+            if input('Enter — повторить проверку в этом запуске; Q — выйти: ').strip().lower() == 'q':
+                raise SetupError('Проверка ADB остановлена пользователем.') from error
+
+
 def prepare(work, manager=None, instance=None):
     print('Для этой сборки выбирайте LDPlayer 9: 64-битная версия на Android 9.')
+    print('Ищу установленный LDPlayer…', flush=True)
     path = find_console(manager)
     if not path:
         print('Открываю официальную партнёрскую страницу загрузки LDPlayer: ' + REFERRAL_URL)
@@ -182,19 +268,26 @@ def prepare(work, manager=None, instance=None):
             webbrowser.open(REFERRAL_URL, new=2)
         except Exception:
             pass
-        input('После установки и первого запуска LDPlayer 9 нажмите Enter: ')
-        path = find_console()
-        if not path:
-            path = find_console(input('Полный путь к папке LDPlayer или ldconsole.exe: ').strip())
-    if not path:
-        raise SetupError('LDPlayer не установлен.')
+        print('Установите и откройте LDPlayer 9. Скрипт обнаружит его автоматически; перезапуск скрипта не требуется.', flush=True)
+    path = wait_installation(path, timeout=180 if path else 600)
+    while path is None:
+        raw = input('LDPlayer ещё не готов. Укажите папку установки, Enter — повторить поиск, Q — выйти: ').strip()
+        if raw.lower() == 'q':
+            raise SetupError('Ожидание LDPlayer остановлено пользователем.')
+        try:
+            explicit = find_console(raw) if raw else None
+            path = wait_installation(explicit, timeout=120)
+        except SetupError as error:
+            print(str(error), flush=True)
     console = Console(path)
+    print('Получаю список устройств LDPlayer…', flush=True)
     index = choose(console.instances(), instance)
     row = console.instances()[index]
     if not row['started']:
         console.selected(index, 'launch')
         wait_state(console, index, True)
-    adb = connect_verified(console, index)
+    adb = connect_interactive(console, index)
+    print('Проверяю права root выбранного устройства…', flush=True)
     if not adb.root():
         snapshot = work / f'ldplayer-before-{index}.json'
         if not snapshot.exists():
@@ -205,10 +298,10 @@ def prepare(work, manager=None, instance=None):
         console.selected(index, 'modify', '--root', 1)
         console.selected(index, 'launch')
         wait_state(console, index, True)
-        adb = connect_verified(console, index)
+        adb = connect_interactive(console, index)
         if not adb.root():
             input('В настройках LDPlayer включите ROOT, перезапустите выбранное устройство и нажмите Enter: ')
-            adb = connect_verified(console, index)
+            adb = connect_interactive(console, index)
             if not adb.root():
                 raise SetupError('LDPlayer не предоставил su -> uid=0. Каталог не запущен.')
     (work / 'device.json').write_text(json.dumps({'platform': 'windows', 'emulator': 'ldplayer',
