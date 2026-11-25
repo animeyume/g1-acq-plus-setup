@@ -27,7 +27,7 @@
 ### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/9c2197fc376aed3de91de10529eca0e7ce422ff5/Windows-OneClick.ps1' -UseBasicParsing | iex"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -UseBasicParsing | iex"
 ```
 
 > Если при копировании двойные кавычки заменились на «ёлочки» (`«…»`), PowerShell примет `{ … }` за отдельный script block и напишет `Параметр ScriptBlock следует указывать только в качестве значения параметра Command`. Вставьте команду в Блокнот и верните обычные `"` — либо используйте вариант без кавычек, который кладёт установщик в текущую папку:
@@ -37,7 +37,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.Service
 ### Mac — Terminal
 
 ```zsh
-(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/9c2197fc376aed3de91de10529eca0e7ce422ff5/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = '379382ba80b6666c126259d56eb3f6916073bba43fc8224cffe56209ad9296fa' ] && /bin/zsh "$g1_script")
+(g1_script="$(mktemp -t g1setup)"; trap 'rm -f -- "$g1_script"' EXIT; curl -fL --retry 2 --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Mac-OneClick.command' -o "$g1_script" && [ "$(shasum -a 256 "$g1_script" | awk '{print $1}')" = '37e9296925bd0665ea5c8160989fd72b3c1940ea75f1316f1b0f9c280c40fc1b' ] && /bin/zsh "$g1_script")
 ```
 
 ### Запуск Windows из архива
