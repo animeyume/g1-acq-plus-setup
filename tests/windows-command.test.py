@@ -124,12 +124,12 @@ class ShortWindowsCommandTests(Harness):
     def command(self):
         return windows_short_command(self.url + '/ok')
 
-    def test_short_line_is_two_plain_statements(self):
+    def test_short_line_is_one_plain_statement(self):
         command = self.command()
-        self.assertTrue(command.startswith("irm '"))
-        self.assertIn(' -OutFile "$env:TEMP', command)
-        self.assertIn('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP', command)
-        self.assertNotIn('iex', command)
+        self.assertTrue(command.startswith('irm '))
+        self.assertTrue(command.endswith(' | iex'))
+        self.assertNotIn('param(', command)
+        self.assertNotIn('[CmdletBinding', command)
         self.assertNotIn('scriptblock', command)
         self.assertLess(len(command), 400)
 

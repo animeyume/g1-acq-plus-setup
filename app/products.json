@@ -95,7 +95,7 @@
     },
     {
       "id": "g1.100gb.9months_eft",
-      "label": "g1.100gb.9months_eft",
+      "label": "100 GB",
       "catalog_seen": false
     },
     {
@@ -245,12 +245,12 @@
     },
     {
       "id": "g1.20tb.1month_eft.acq",
-      "label": "g1.20tb.1month_eft.acq",
+      "label": "Google AI Ultra (20 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.20tb.3months_ip_90p.acq",
-      "label": "g1.20tb.3months_ip_90p.acq",
+      "label": "Google AI Ultra (20 TB)",
       "catalog_seen": false
     },
     {
@@ -380,22 +380,22 @@
     },
     {
       "id": "g1.2tb.ai.12months_ip_90p",
-      "label": "g1.2tb.ai.12months_ip_90p",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.2tb.ai.15months_eft",
-      "label": "g1.2tb.ai.15months_eft",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.2tb.ai.18months_eft",
-      "label": "g1.2tb.ai.18months_eft",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.2tb.ai.1month_ip_95p.acq",
-      "label": "g1.2tb.ai.1month_ip_95p.acq",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
@@ -420,12 +420,12 @@
     },
     {
       "id": "g1.2tb.ai.3months_ip_90p.acq",
-      "label": "g1.2tb.ai.3months_ip_90p.acq",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.2tb.ai.4months_eft",
-      "label": "g1.2tb.ai.4months_eft",
+      "label": "Google AI Pro (5 TB)",
       "catalog_seen": false
     },
     {
@@ -585,12 +585,12 @@
     },
     {
       "id": "g1.ai.ultra.1month_eft.acq",
-      "label": "g1.ai.ultra.1month_eft.acq",
+      "label": "Google AI Ultra (30 TB)",
       "catalog_seen": false
     },
     {
       "id": "g1.ai.ultra.3months_ip_90p.acq",
-      "label": "g1.ai.ultra.3months_ip_90p.acq",
+      "label": "Google AI Ultra (30 TB)",
       "catalog_seen": false
     },
     {
@@ -678,5 +678,49 @@
       "label": "YouTube Premium Individual Add On",
       "catalog_seen": true
     }
+  ],
+  "ultra_candidates": [
+    "g1.20tb.1month_eft",
+    "g1.20tb.3months_eft",
+    "g1.20tb.6months_eft",
+    "g1.20tb.12months_eft",
+    "g1.20tb.18months_eft",
+    "g1.20tb.1year_eft",
+    "g1.20tb.subs_variant",
+    "g1.20tb.1month_ip_90p",
+    "g1.20tb.3months_ip_90p",
+    "g1.20tb.12months_ip_90p",
+    "g1.ai.ultra.1month_eft",
+    "g1.ai.ultra.3months_eft",
+    "g1.ai.ultra.6months_eft",
+    "g1.ai.ultra.12months_eft",
+    "g1.ai.ultra.18months_eft",
+    "g1.ai.ultra.1year_eft",
+    "g1.ai.ultra.subs_variant",
+    "g1.ai.ultra.1month_ip_90p",
+    "g1.ai.ultra.3months_ip_90p",
+    "g1.ai.ultra.12months_ip_90p",
+    "g1.ai.pro.1month_eft",
+    "g1.ai.pro.3months_eft",
+    "g1.ai.pro.12months_eft",
+    "g1.ai.pro.1year_eft",
+    "g1.ai.pro.subs_variant",
+    "g1.ai.pro.3months_ip_90p",
+    "g1.5tb.1month_eft",
+    "g1.5tb.3months_eft",
+    "g1.5tb.12months_eft",
+    "g1.5tb.1year_eft",
+    "g1.5tb.subs_variant",
+    "g1.5tb.3months_ip_90p",
+    "g1.20tb",
+    "g1.20tb.v2.1month_eft",
+    "g1.20tb.v2.3months_ip_90p",
+    "g1.20tb.v2.1year_eft",
+    "g1.ai.ultra",
+    "g1.play.20tb.1month_eft",
+    "g1.play.ai.pro.1month_eft",
+    "g1.10tb.1month_eft",
+    "g1.10tb.12months_eft",
+    "g1.10tb.3months_ip_90p"
   ]
 }

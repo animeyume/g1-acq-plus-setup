@@ -65,6 +65,7 @@ for (const name of ['PurchasesUpdatedListener', 'BillingClientStateListener', 'P
   classes['com.android.billingclient.api.' + name] = {};
 }
 classes['android.app.Activity'] = {};
+classes['android.app.ActivityThread$ActivityClientRecord'] = {};
 const sandbox = {send: x => events.push(x), rpc: {exports: {}}, setImmediate, setTimeout, clearTimeout,
   Java: {classFactory: {}, perform: fn => fn(), retain: x => x, cast: x => x, scheduleOnMainThread: fn => fn(),
     use(name) { assert.ok(name in classes, 'Unknown Java class: ' + name); return classes[name]; },
@@ -74,7 +75,7 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../app/billing.js'), 'u
 (async () => {
   await new Promise(setImmediate);
   assert.equal(events[0].event, 'ready'); assert.equal(events[0].code, 0);
-  await assert.rejects(sandbox.rpc.exports.openCheckout('missing'), /Refresh/);
+  await assert.rejects(sandbox.rpc.exports.openCheckout('missing'), /Обновите/);
   assert.equal(calls.length, 0);
   const data = await sandbox.rpc.exports.query(['g1.2tb.ai.12months_eft']);
   assert.equal(data.code, 0); assert.equal(data.offers.length, 2);
@@ -83,11 +84,15 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../app/billing.js'), 'u
   assert.equal(data.offers[1].offer, '');
   assert.equal(JSON.stringify(data).includes('FRESH_TOKEN'), false);
   assert.equal(calls.length, 0, 'Catalog reads must not open checkout');
-  await assert.rejects(sandbox.rpc.exports.query(Array(21).fill('g1.2tb.ai')), /1..20/);
+  await assert.rejects(sandbox.rpc.exports.query(Array(21).fill('g1.2tb.ai')), /1 до 20/);
   const opened = await sandbox.rpc.exports.openCheckout(data.offers[0].key);
   assert.equal(opened.code, 0); assert.equal(calls.length, 1);
   assert.equal(calls[0].setProductDetailsParamsList.items[0].setOfferToken, 'FRESH_TOKEN_trial');
   stateListener.onBillingServiceDisconnected();
-  await assert.rejects(sandbox.rpc.exports.query(['g1.2tb.ai']), /not ready/);
-  console.log('Billing bridge: 10 offline checks passed. No Android transaction executed.');
+  await assert.rejects(sandbox.rpc.exports.query(['g1.2tb.ai']), /не готов/);
+  stateListener.onBillingSetupFinished(result);
+  classes['android.app.ActivityThread'].currentActivityThread = () => ({});
+  const noWindow = await sandbox.rpc.exports.openCheckout(data.offers[0].key);
+  assert.equal(noWindow.code, -2, 'missing mActivities must return -2, not TypeError');
+  console.log('Billing bridge: 12 offline checks passed. No Android transaction executed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

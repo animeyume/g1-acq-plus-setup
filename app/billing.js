@@ -36,14 +36,26 @@ function initialize() {
   client.startConnection(hold(State.$new()));
 }
 
+function ensureReady() {
+  return new Promise(function(resolve, reject) {
+    if (ready) { resolve(true); return; }
+    var started = Date.now();
+    (function poll() {
+      if (ready) { resolve(true); return; }
+      if (Date.now() - started > 20000) { reject(new Error('BillingClient не готов: Google Play не отвечает.')); return; }
+      setTimeout(poll, 250);
+    })();
+  });
+}
+
 function query(ids) {
   return new Promise(function(resolve, reject) {
-    var timer = setTimeout(function() { reject(new Error('Google Play query timed out')); }, 45000);
+    var timer = setTimeout(function() { reject(new Error('Google Play не ответил на запрос за 45 секунд.')); }, 45000);
     function finish(value) { clearTimeout(timer); resolve(value); }
     Java.perform(function() {
       try {
-        if (!ready) throw new Error('BillingClient is not ready');
-        if (!Array.isArray(ids) || ids.length < 1 || ids.length > 20) throw new Error('Expected 1..20 product IDs');
+        if (!ready) throw new Error('BillingClient не готов.');
+        if (!Array.isArray(ids) || ids.length < 1 || ids.length > 20) throw new Error('Ожидалось от 1 до 20 идентификаторов.');
         factory(loader);
         var Product = Java.use('com.android.billingclient.api.QueryProductDetailsParams$Product');
         var Params = Java.use('com.android.billingclient.api.QueryProductDetailsParams');
@@ -89,42 +101,117 @@ function query(ids) {
   });
 }
 
-function currentActivity() {
-  factory(null);
-  var thread = Java.use('android.app.ActivityThread').currentActivityThread();
-  var iterator = thread.mActivities.value.values().iterator();
-  while (iterator.hasNext()) {
-    var record = iterator.next();
-    var activity = record.activity.value;
-    if (activity && !activity.isFinishing() && !record.paused.value) return activity;
+/* Field access never throws: Frida returns undefined for a field the running
+   Android build does not expose, and \"undefined.value\" was the old crash. */
+function fieldValue(target, name) {
+  if (!target) return null;
+  try {
+    var field = target[name];
+    if (field === undefined || field === null) return null;
+    return field.value;
+  } catch (error) { return null; }
+}
+
+function mapValues(map) {
+  try { return map.values(); } catch (error) {
+    return Java.cast(map, Java.use('java.util.Map')).values();
   }
-  return null;
+}
+
+function threadInstance() {
+  factory(null);
+  var thread = null;
+  try { thread = Java.use('android.app.ActivityThread').currentActivityThread(); } catch (error) { thread = null; }
+  if (thread) return thread;
+  try {
+    Java.choose('android.app.ActivityThread', {onMatch: function (instance) { thread = instance; return 'stop'; }});
+  } catch (error) { thread = null; }
+  return thread;
+}
+
+/* Every window of the hooked Google One process, newest state first. */
+function activityList() {
+  var result = [];
+  var thread = threadInstance();
+  if (!thread) return result;
+  var map = fieldValue(thread, 'mActivities');
+  if (!map) return result;
+  try {
+    var Record = Java.use('android.app.ActivityThread$ActivityClientRecord');
+    var Activity = Java.use('android.app.Activity');
+    var values = mapValues(map);
+    if (!values) return result;
+    var iterator = values.iterator();
+    while (iterator.hasNext()) {
+      var record = null, activity = null;
+      try { record = Java.cast(iterator.next(), Record); } catch (error) { record = null; }
+      if (!record) continue;
+      try { activity = Java.cast(fieldValue(record, 'activity'), Activity); } catch (error) { activity = null; }
+      if (!activity) continue;
+      var finishing = false;
+      try { finishing = activity.isFinishing(); } catch (error) { finishing = false; }
+      if (finishing) continue;
+      var focused = false;
+      try { focused = activity.hasWindowFocus(); } catch (error) { focused = false; }
+      var name = '';
+      try { name = String(activity.getClass().getName()); } catch (error) { name = ''; }
+      result.push({instance: activity, paused: fieldValue(record, 'paused') === true, focused: focused, name: name});
+    }
+  } catch (error) { }
+  return result;
+}
+
+function pickActivity() {
+  var list = activityList();
+  var i;
+  for (i = 0; i < list.length; i++) {
+    if (!list[i].paused && list[i].focused) return list[i];
+  }
+  for (i = 0; i < list.length; i++) {
+    if (!list[i].paused) return list[i];
+  }
+  return list.length ? list[0] : null;
+}
+
+function currentActivity() {
+  var picked = pickActivity();
+  return picked ? picked.instance : null;
 }
 
 function openCheckout(key) {
-  return new Promise(function(resolve, reject) {
+  return ensureReady().then(function() { return new Promise(function(resolve, reject) {
     Java.perform(function() {
       try {
-        if (!ready || !cache[key]) throw new Error('Refresh the selected offer first');
+        if (!cache[key]) throw new Error('Предложение не загружено. Обновите список клавишей r.');
         Java.scheduleOnMainThread(function() {
           try {
-            var activity = currentActivity();
-            if (!activity) throw new Error('Open Google One in the emulator and retry');
+            var picked = pickActivity();
+            if (!picked) {
+              resolve({code: -2, message: 'В процессе Google One нет активного окна.', activity: '', focused: false});
+              return;
+            }
             factory(loader);
             var PDP = Java.use('com.android.billingclient.api.BillingFlowParams$ProductDetailsParams');
             var Flow = Java.use('com.android.billingclient.api.BillingFlowParams');
             var items = Java.use('java.util.ArrayList').$new();
             items.add(PDP.newBuilder().setProductDetails(cache[key].product).setOfferToken(cache[key].token).build());
-            var result = client.launchBillingFlow(Java.cast(activity, Java.use('android.app.Activity')), Flow.newBuilder().setProductDetailsParamsList(items).build());
-            resolve({code: result.getResponseCode(), message: String(result.getDebugMessage() || '')});
+            var result = client.launchBillingFlow(Java.cast(picked.instance, Java.use('android.app.Activity')),
+              Flow.newBuilder().setProductDetailsParamsList(items).build());
+            resolve({code: result.getResponseCode(), message: String(result.getDebugMessage() || ''),
+              activity: picked.name, focused: picked.focused});
           } catch(error) { reject(error); }
         });
       } catch(error) { reject(error); }
     });
-  });
+  }); });
 }
 
-rpc.exports = {status: function() { return {ready: ready}; }, query: query, openCheckout: openCheckout};
+rpc.exports = {
+  status: function() { return {ready: ready}; },
+  activity: function() { var out = []; Java.perform(function() { var list = activityList(); for (var i = 0; i < list.length; i++) out.push({name: list[i].name, paused: list[i].paused, focused: list[i].focused}); }); return out; },
+  query: query,
+  openCheckout: openCheckout
+};
 setImmediate(function() { Java.perform(function() {
   try { initialize(); } catch(error) { event('ready', {code: -1, message: String(error)}); }
 }); });

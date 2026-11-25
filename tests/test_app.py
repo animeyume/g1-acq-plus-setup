@@ -33,8 +33,8 @@ class CatalogTests(unittest.TestCase):
         session = Mock()
         session.query.return_value = []
         g1plus.scan(session, g1plus.load_products())
-        self.assertEqual(session.query.call_count, 7)
-        self.assertTrue(all(len(c.args[0]) <= 20 for c in session.query.call_args_list))
+        self.assertEqual(session.query.call_count, 14)
+        self.assertTrue(all(len(c.args[0]) <= 10 for c in session.query.call_args_list))
         session.checkout.assert_not_called()
 
     def test_offers_are_grouped_and_sorted_best_first(self):
@@ -46,10 +46,88 @@ class CatalogTests(unittest.TestCase):
             {'key': 'c', 'product': 'g1.2tb.ai', 'title': 'Google AI Pro (5 TB)', 'base_plan': 'm', 'offer': 'introprice',
              'phases': [{'price': '0,99 €', 'period': 'P3M', 'cycles': 1}]},
         ]
+        g1plus.label_rows(rows, {})
         grouped = g1plus.group_offers(rows)
-        self.assertEqual(sorted(grouped), ['100 GB (Google One)', 'Google AI Pro (5 TB)'])
-        self.assertEqual([row['key'] for row in grouped['100 GB (Google One)']], ['a', 'b'])
-        self.assertEqual(len(grouped['Google AI Pro (5 TB)']), 1)
+        self.assertEqual(sorted(grouped), ['100 ГБ', 'AI Pro 5 ТБ'])
+        self.assertEqual([row['key'] for row in grouped['100 ГБ']], ['a', 'b'])
+        self.assertEqual(len(grouped['AI Pro 5 ТБ']), 1)
+
+    def test_ultra_base_plan_is_visible_in_the_table(self):
+        rows = [
+            {'key': 'pro', 'product': 'g1.2tb.ai', 'title': 'Google AI Pro (5 TB) (Google One)',
+             'base_plan': 'monthly', 'offer': 'eft-12months',
+             'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1, 'recurrence': 2},
+                        {'price': '$19.99', 'period': 'P1M', 'cycles': 0, 'recurrence': 1}]},
+            {'key': 'ultra', 'product': 'g1.20tb.v2', 'title': 'Google AI Ultra (20 TB) (Google One)',
+             'base_plan': 'p1m', 'offer': '',
+             'phases': [{'price': '$99.99', 'period': 'P1M', 'cycles': 0, 'recurrence': 1}]},
+        ]
+        g1plus.label_rows(rows, {})
+        self.assertEqual(rows[1]['plan'], 'AI Ultra 20 ТБ')
+        self.assertEqual(rows[1]['kind'], 'базовый')
+        output = io.StringIO()
+        with redirect_stdout(output):
+            table = g1plus.render(rows, '', True)
+        text = output.getvalue()
+        self.assertIn('AI Ultra 20 ТБ', text)
+        self.assertIn('базовый', text)
+        self.assertEqual(len(table), 2)
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(len(g1plus.render(rows, '', False)), 1)
+
+    def test_titles_and_periods_are_russian(self):
+        self.assertEqual(g1plus.plan_for('g1.100gb', '100 GB', ''), '100 ГБ')
+        self.assertEqual(g1plus.plan_for('g1.2tb.ai', '', 'Google AI Pro (5 TB)'), 'AI Pro 5 ТБ')
+        self.assertEqual(g1plus.plan_for('g1.20tb.v2', '', 'Google AI Ultra (20 TB) (Google One)'),
+                         'AI Ultra 20 ТБ')
+        self.assertEqual(g1plus.plan_for('g1.youtube_premium_individual_add_on',
+                                         'YouTube Premium Individual Add On', ''), 'YouTube Premium')
+        row = {'key': 'free', 'product': 'g1.2tb.ai.18months_eft', 'title': 'Google AI Pro (5 TB)',
+               'base_plan': 'monthly', 'offer': 'eft-18months',
+               'phases': [{'price': 'Free', 'period': 'P1Y6M', 'cycles': 1, 'recurrence': 2},
+                          {'price': '$19.99', 'period': 'P1M', 'cycles': 0, 'recurrence': 1}]}
+        self.assertEqual(g1plus.price_cell(row), 'Free')
+        self.assertEqual(g1plus.time_cell(row), '1 г. 6 мес.')
+        self.assertEqual(g1plus.renew_cell(row), '$19.99/мес.')
+        self.assertEqual(g1plus.describe(row),
+                         'Free / 1 г. 6 мес. × 1 → $19.99 / 1 мес. (далее, с автопродлением)')
+
+    def test_checkout_retries_only_when_no_window_is_active(self):
+        row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
+               'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
+        session = Mock()
+        session.query.return_value = [row]
+        session.checkout.side_effect = [{'code': -2, 'message': 'no window'}, {'code': 0}]
+        result = g1plus.launch_checkout(session, row)
+        self.assertEqual(result['code'], 0)
+        session.foreground.assert_called_once_with(delay=1.6)
+        self.assertEqual(session.checkout.call_count, 2)
+        session.checkout.side_effect = [{'code': 5, 'message': 'declined'}]
+        self.assertEqual(g1plus.launch_checkout(session, row)['code'], 5)
+        self.assertEqual(session.checkout.call_count, 3)
+
+    def test_ultra_check_queries_every_ultra_sku(self):
+        catalog = {
+            'catalog_products': 1, 'commit': '',
+            'products': [{'id': 'g1.20tb.v2', 'label': 'Google AI Ultra (20 TB)', 'catalog_seen': True}],
+            'ultra_candidates': ['g1.20tb.1month_eft', 'g1.ai.ultra.1month_eft'],
+        }
+        offer = {'key': 'ultra-trial', 'product': 'g1.20tb.1month_eft', 'title': 'Google AI Ultra (20 TB)',
+                 'base_plan': 'p1m', 'offer': 'eft-1month',
+                 'phases': [{'price': 'Free', 'period': 'P1M', 'cycles': 1, 'recurrence': 2},
+                            {'price': '$99.99', 'period': 'P1M', 'cycles': 0, 'recurrence': 1}]}
+        session = Mock()
+        session.query.side_effect = lambda ids: [offer] if ids == ['g1.20tb.1month_eft'] else []
+        output = io.StringIO()
+        with redirect_stdout(output):
+            found = g1plus.check_ultra(session, catalog, {})
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]['plan'], 'AI Ultra 20 ТБ')
+        self.assertEqual(session.query.call_count, 3)
+        text = output.getvalue()
+        self.assertIn('Google Play отдал по Ultra', text)
+        self.assertIn('g1.20tb.v2', text)
+        self.assertIn('App Store', text)
 
     def test_missing_offer_does_not_fall_back(self):
         session = Mock()
@@ -58,42 +136,35 @@ class CatalogTests(unittest.TestCase):
             g1plus.select_current(session, {'key': 'selected', 'product': 'g1.2tb.ai'})
         session.checkout.assert_not_called()
 
-    def test_number_starts_checkout_without_extra_confirmation(self):
+    def row_for_interactive(self):
         row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
                'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
-        session = Mock()
-        session.query.return_value = [row]
-        session.checkout.return_value = {'code': 0}
-        with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
-                patch('g1plus.credit') as credit:
-            g1plus.interactive(session, [row], lambda: [row])
-        session.checkout.assert_called_once_with('selected')
-        visit.assert_called_once_with()
-        credit.assert_called_once_with()
+        return g1plus.label_rows([row], {})
 
-    def test_explicit_yes_opens_selected_offer_only(self):
-        row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
-               'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
+    def test_number_starts_checkout_without_extra_confirmation(self):
+        rows = self.row_for_interactive()
         session = Mock()
-        session.query.return_value = [row]
+        session.query.return_value = rows
         session.checkout.return_value = {'code': 0}
         with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
-                patch('g1plus.credit') as credit:
-            g1plus.interactive(session, [row], lambda: [row])
+                patch('g1plus.credit') as credit, redirect_stdout(io.StringIO()):
+            g1plus.interactive(session, rows, lambda: rows,
+                               {'products': [], 'catalog_products': 0, 'commit': ''}, {})
         session.checkout.assert_called_once_with('selected')
         visit.assert_called_once_with()
         credit.assert_called_once_with()
 
     def test_refused_checkout_keeps_site_closed(self):
-        row = {'key': 'selected', 'product': 'g1.2tb.ai', 'title': 'Pro', 'base_plan': 'monthly', 'offer': 'trial',
-               'phases': [{'price': 'Free', 'period': 'P1Y', 'cycles': 1}]}
+        rows = self.row_for_interactive()
         session = Mock()
-        session.query.return_value = [row]
+        session.query.return_value = rows
+        session.activities.return_value = []
         session.checkout.return_value = {'code': 5, 'message': 'declined'}
         session.open_store_page.return_value = 'https://play.google.com/...'
         with patch('builtins.input', side_effect=['1', '', 'q']), patch('g1plus.visit') as visit, \
-                patch('g1plus.credit') as credit:
-            g1plus.interactive(session, [row], lambda: [row])
+                patch('g1plus.credit') as credit, redirect_stdout(io.StringIO()):
+            g1plus.interactive(session, rows, lambda: rows,
+                               {'products': [], 'catalog_products': 0, 'commit': ''}, {})
         visit.assert_not_called()
         credit.assert_not_called()
         session.open_store_page.assert_called_once_with('g1.2tb.ai')
@@ -245,7 +316,7 @@ class SponsorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root, redirect_stdout(io.StringIO()), \
                 patch('g1plus.credit') as credit, patch('g1plus.visit') as visit, \
                 patch('builtins.input', return_value=''), \
-                patch('g1plus.interactive', side_effect=lambda s, rows, refresh: (refresh(), refresh())):
+                patch('g1plus.interactive', side_effect=lambda s, rows, refresh, catalog, labels: (refresh(), refresh())):
             g1plus.run_catalog(session, g1plus.load_products(), Path(root), limit=1)
         credit.assert_not_called()
         visit.assert_not_called()

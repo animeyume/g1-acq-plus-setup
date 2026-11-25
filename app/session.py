@@ -5,7 +5,7 @@ import struct
 import threading
 import time
 
-from support import SetupError, download
+from support import PKG, SetupError, download
 
 
 def prepare_server(adb, work, version):
@@ -98,13 +98,30 @@ class BillingSession:
             raise SetupError('Google Play: ' + str(result.get('code')) + ' ' + result.get('message', ''))
         return result['offers']
 
+    def foreground(self, delay=0.8):
+        """Поднимает Google One: окно оплаты открывается только из активного окна."""
+        self.adb.shell('monkey', '-p', PKG, '-c', 'android.intent.category.LAUNCHER', '1', check=False)
+        time.sleep(delay)
+
+    def activities(self):
+        try:
+            return list(self.script.exports_sync.activity())
+        except Exception:
+            return []
+
     def checkout(self, key):
+        """Открывает окно Google Play для выбранного предложения без подтверждения покупки."""
+        self.foreground()
         return self.script.exports_sync.open_checkout(key)
 
     def open_store_page(self, product):
-        """Fallback when the billing flow cannot start in the hooked process."""
+        """Запасной путь: страница подписки внутри эмулятора, а не в браузере Windows."""
         url = ('https://play.google.com/store/account/subscriptions?sku=' + str(product)
-               + '&package=' + 'com.google.android.apps.subscriptions.red')
+               + '&package=' + PKG)
+        for package in (PKG, 'com.android.vending'):
+            text = self.adb.shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', url, '-p', package, check=False)
+            if 'Error' not in text:
+                return url
         self.adb.shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', url, check=False)
         return url
 
