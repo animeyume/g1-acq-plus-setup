@@ -16,6 +16,7 @@ from build_commands import windows_portable_command, windows_short_command
 
 FIXTURE = b"Write-Output 'G1_TEST_INSTALLER_RAN'\n"
 FAILED = b"Write-Output 'G1_TEST_INSTALLER_RAN'\nexit 7\n"
+CMDLET = b"[CmdletBinding()]\nparam([string]$InstallDir)\nWrite-Output 'G1_TEST_INSTALLER_RAN'\n"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -132,6 +133,11 @@ class ShortWindowsCommandTests(Harness):
         result = self.run_body(self.command('/404'))
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('G1_TEST_INSTALLER_RAN', result.stdout)
+
+    def test_attributes_and_param_are_accepted(self):
+        result = self.run_body(self.command('/', data=CMDLET))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count('G1_TEST_INSTALLER_RAN'), 1)
 
     def test_fixture_is_executed_once(self):
         result = self.run_body(self.command())

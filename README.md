@@ -27,7 +27,7 @@
 ### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -UseBasicParsing | iex"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -UseBasicParsing)))"
 ```
 
 > Если при копировании двойные кавычки заменились на «ёлочки» (`«…»`), PowerShell примет `{ … }` за отдельный script block и напишет `Параметр ScriptBlock следует указывать только в качестве значения параметра Command`. Вставьте команду в Блокнот и верните обычные `"` — либо используйте вариант без кавычек, который кладёт установщик в текущую папку:

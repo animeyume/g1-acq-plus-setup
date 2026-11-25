@@ -21,10 +21,15 @@ def windows_command(url, checksum):
 
 
 def windows_short_command(url):
-    """One short line for PowerShell or cmd; the commit in the URL pins content."""
+    """One short line for PowerShell or cmd; the commit in the URL pins content.
+
+    Windows PowerShell 5.1 rejects [CmdletBinding()] and param(...) when the
+    downloaded text goes straight into Invoke-Expression, so the text is turned
+    into a script block first, which is parsed in script scope.
+    """
     body = ("[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; "
-            "iwr '" + url + "' -UseBasicParsing | iex")
-    if any(char in body for char in ('"', '%', '!', '\n', '\r')):
+            "& ([scriptblock]::Create((irm '" + url + "' -UseBasicParsing)))")
+    if any(char in body for char in ('"', '%', '!', '\n', '\r', '$')):
         raise ValueError('Command contains characters requiring shell-specific escaping')
     result = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' + body + '"'
     if len(result) >= 8191:
