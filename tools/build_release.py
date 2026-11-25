@@ -76,6 +76,43 @@ G1_PAYLOAD_BASE64
 /bin/zsh "$g1_stage/payload/install/mac.zsh" "$@"
 '''
 
+WINDOWS_START = '''@echo off
+setlocal
+if not exist "%~dp0Windows-OneClick.ps1" (
+    echo Extract all files from the ZIP before running START.cmd.
+    pause
+    exit /b 2
+)
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Windows-OneClick.ps1"
+set "g1_result=%ERRORLEVEL%"
+if not "%g1_result%"=="0" pause
+exit /b %g1_result%
+'''
+
+
+def local_windows_bundle():
+    launcher = WINDOWS_START.replace('\n', '\r\n').encode('ascii')
+    readme = (
+        'Запуск G1 ACQ Plus на Windows\r\n\r\n'
+        '1. Скопируйте ZIP на Windows-ПК и извлеките ВСЕ файлы в одну папку.\r\n'
+        '2. Запустите START.cmd.\r\n'
+        '3. Если LDPlayer не установлен, установите его с открывшейся\r\n'
+        '   партнёрской страницы и вернитесь в скрипт.\r\n\r\n'
+        'Файл Windows-OneClick.ps1 содержит исходники и BillingClient DEX.\r\n'
+        'Для загрузки Python, зависимостей и эмулятора требуется Интернет.\r\n'
+        'Спонсор: https://animeyume.online\r\n'
+    ).encode('utf-8-sig')
+    files = {'START.cmd': launcher, 'Windows-OneClick.ps1': (OUT / 'Windows-OneClick.ps1').read_bytes(), 'README.txt': readme}
+    files['SHA256SUMS.txt'] = ''.join(digest(data) + '  ' + name + '\n' for name, data in files.items()).encode('ascii')
+    name = 'G1AcqPlus-Windows-Local.zip'
+    with zipfile.ZipFile(OUT / name, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path, data in files.items():
+            entry = zipfile.ZipInfo(path, date_time=(2026, 11, 25, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, data)
+    return name
+
 
 def main():
     OUT.mkdir(exist_ok=True)
@@ -88,6 +125,7 @@ def main():
         if name.endswith('.command'):
             (OUT / name).chmod(0o755)
     names = [f'G1AcqPlus-{VERSION}.zip', 'Windows-OneClick.ps1', 'Mac-OneClick.command']
+    names.append(local_windows_bundle())
     (OUT / 'SHA256SUMS.txt').write_text(''.join(digest((OUT / name).read_bytes()) + '  ' + name + '\n' for name in names), encoding='ascii')
     print(f'Built {len(PAYLOAD)} payload files; ZIP {len(data)} bytes; SHA256 {digest(data)}')
 

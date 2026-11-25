@@ -30,3 +30,7 @@ Windows: LDPlayer. macOS Apple Silicon: MuMu.
 Команды для вставки: [COMMANDS.txt](COMMANDS.txt).
 
 ![Пример баннера спонсора](sponsor-preview.png)
+
+Локальный запуск Windows: извлеките все файлы из `G1AcqPlus-Windows-Local.zip` и запустите `START.cmd`. Интернет потребуется для установки среды и эмулятора.
+
+Команда загрузки останавливается при HTTP/сетевой ошибке, проверяет наличие файла и его SHA256 до запуска. Шесть регрессионных проверок: `tests/windows-bootstrap.ps1`.
