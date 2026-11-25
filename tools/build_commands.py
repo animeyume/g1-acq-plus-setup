@@ -20,6 +20,18 @@ def windows_command(url, checksum):
     )
 
 
+def windows_short_command(url):
+    """One short line for PowerShell or cmd; the commit in the URL pins content."""
+    body = ("[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; "
+            "iwr '" + url + "' -UseBasicParsing | iex")
+    if any(char in body for char in ('"', '%', '!', '\n', '\r')):
+        raise ValueError('Command contains characters requiring shell-specific escaping')
+    result = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "' + body + '"'
+    if len(result) >= 8191:
+        raise ValueError('Command exceeds the cmd.exe command-line limit')
+    return result
+
+
 def windows_portable_command(url, checksum):
     # No variable interpolation or shell operators in the surrounding shell:
     # both cmd.exe and PowerShell pass this literal argument to powershell.exe.
@@ -60,9 +72,13 @@ def main():
         "curl -fL --retry 2 --proto '=https' --proto-redir '=https' '" + url + "Mac-OneClick.command' -o \"$g1_script\" && "
         "[ \"$(shasum -a 256 \"$g1_script\" | awk '{print $1}')\" = '" + mac_hash + "' ] && /bin/zsh \"$g1_script\")"
     )
-    content = 'Windows — PowerShell или cmd, одна строка:\n' + windows + '\n\nMac Terminal — одна строка:\n' + mac + '\n'
+    short = windows_short_command(url + 'Windows-OneClick.ps1')
+    content = ('Windows — PowerShell или cmd, одна строка (короткая):\n' + short + '\n\n'
+               'Windows — вариант с проверкой SHA256:\n' + windows + '\n\n'
+               'Mac Terminal — одна строка:\n' + mac + '\n')
     (ROOT / 'COMMANDS.txt').write_text(content, encoding='utf-8')
     (out / 'COMMANDS.txt').write_text(content, encoding='utf-8')
+    (out / 'windows-short-command.txt').write_text(short + '\n', encoding='ascii')
     (out / 'windows-command.ps1').write_text(bootstrap + '\n', encoding='utf-8-sig')
     (out / 'windows-portable-command.txt').write_text(windows + '\n', encoding='ascii')
     (out / 'mac-command.zsh').write_text(mac + '\n', encoding='utf-8')

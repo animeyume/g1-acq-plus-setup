@@ -21,12 +21,12 @@
 
 ## Команды запуска
 
-Актуальные команды с проверкой контрольной суммы находятся в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
+Короткая команда ниже — для PowerShell и cmd; ссылка закреплена на неизменяемый коммит. Вариант с проверкой SHA256 и команда для Mac — в **[COMMANDS.txt](COMMANDS.txt)**. Каждую команду вставляйте целиком одной строкой.
 
 ### Windows — PowerShell или командная строка (cmd)
 
 ```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/d73a3fdb1356c8c69001d1398e3a713d207e7f73/Windows-OneClick.ps1' -OutFile ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -ErrorAction Stop; if(-not (Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf)){throw 'Download did not create a file'}; if((Get-FileHash -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Algorithm SHA256 -ErrorAction Stop).Hash -ne '82451c1b6b619e657ce760b19a5b64875a48cddf6a933475bf3ae856301ea91a'){throw 'Checksum mismatch'}; . ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))); exit (Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue) } finally { if(Test-Path -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -PathType Leaf){Remove-Item -LiteralPath ([IO.Path]::Combine([IO.Path]::GetTempPath(),('G1-'+[Diagnostics.Process]::GetCurrentProcess().Id+'.ps1'))) -Force -ErrorAction SilentlyContinue} }"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/d73a3fdb1356c8c69001d1398e3a713d207e7f73/Windows-OneClick.ps1' -UseBasicParsing | iex"
 ```
 
 ### Mac — Terminal
