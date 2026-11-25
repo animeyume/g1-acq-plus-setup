@@ -14,7 +14,7 @@ from session import BillingSession, prepare_server
 from sponsor import announce
 
 APP = Path(__file__).resolve().parent
-VERSION = '2.0.2'
+VERSION = '2.0.3'
 
 
 def load_products(path=APP / 'products.json'):

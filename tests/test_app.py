@@ -75,6 +75,24 @@ class DeviceTests(unittest.TestCase):
             for serial in ('10.0.0.2:5555', 'emulator-5554', '127.0.0.1:0', '127.0.0.1:99999'):
                 with self.assertRaises(support.SetupError): support.Adb(exe, serial)
 
+    def test_named_emulator_requires_explicit_opt_in(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'adb.exe'; exe.touch()
+            self.assertEqual(support.Adb(exe, 'emulator-5554', allow_emulator=True).serial, 'emulator-5554')
+            for serial in ('USB12345', '10.0.0.2:5555', 'emulator-0', 'emulator-65536'):
+                with self.assertRaises(support.SetupError):
+                    support.Adb(exe, serial, allow_emulator=True)
+
+    def test_named_emulator_connect_skips_tcp_and_ignores_stderr_warnings(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'adb.exe'; exe.touch()
+            adb = support.Adb(exe, 'emulator-5554', allow_emulator=True)
+            with patch('support.run', return_value=Mock(stdout='1\r\n', stderr='daemon warning')) as run:
+                adb.connect()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][1:3], ['-s', 'emulator-5554'])
+        self.assertNotIn('connect', run.call_args.args[0])
+
     def test_su_command_quotes_spaces(self):
         with tempfile.TemporaryDirectory() as root:
             adb = self.adb(root)
@@ -211,24 +229,84 @@ class LDPlayerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             exe = Path(root) / 'ldconsole.exe'; exe.touch()
             (Path(root) / 'adb.exe').touch()
-            console = Mock(exe=exe)
-            with patch('ldplayer.Adb') as cls:
+            console = Mock(exe=exe); console.selected.return_value = ''
+            listed = Mock(stdout='List of devices attached\nemulator-5562 device\n', stderr='', returncode=0)
+            with patch('ldplayer.Adb') as cls, patch('ldplayer.run', return_value=listed):
                 cls.return_value.shell.return_value = ''
                 with self.assertRaises(support.SetupError):
-                    ldplayer.connect_verified(console, 4)
-            cls.assert_called_once_with(Path(root) / 'adb.exe', '127.0.0.1:5563')
+                    ldplayer.connect_verified(console, 4, timeout=0)
+            cls.assert_called_once_with(Path(root) / 'adb.exe', 'emulator-5562', allow_emulator=True)
             cls.return_value.root.assert_not_called()
 
     def test_successful_mapping_verified_through_vendor_console(self):
         with tempfile.TemporaryDirectory() as root:
             exe = Path(root) / 'ldconsole.exe'; exe.touch()
             (Path(root) / 'adb.exe').touch()
-            console = Mock(exe=exe)
-            with patch('ldplayer.Adb') as cls, patch('ldplayer.secrets.token_hex', return_value='abc123'):
+            console = Mock(exe=exe); console.selected.return_value = ''
+            listed = Mock(stdout='List of devices attached\nemulator-5562 device\n', stderr='', returncode=0)
+            with patch('ldplayer.Adb') as cls, patch('ldplayer.secrets.token_hex', return_value='abc123'), \
+                    patch('ldplayer.run', return_value=listed):
                 cls.return_value.shell.return_value = '/data/local/tmp/g1plus-device-abc123'
                 self.assertIs(ldplayer.connect_verified(console, 4), cls.return_value)
             console.selected.assert_called_once_with(4, 'adb', '--command', 'shell touch /data/local/tmp/g1plus-device-abc123')
             cls.return_value.root.assert_not_called()
+
+    def test_device_listing_excludes_usb_and_remote_connections(self):
+        rows = ldplayer.parse_adb_devices('List of devices attached\nUSB123 device usb:1-2\nemulator-5554 device usb:1-2\n10.1.0.5:5555 device\nemulator-5556 device product:test\n127.0.0.1:6000 offline\n')
+        self.assertEqual(rows, [{'serial': 'emulator-5556', 'state': 'device'}, {'serial': '127.0.0.1:6000', 'state': 'offline'}])
+
+    def test_actual_device_is_selected_by_vendor_marker_not_port_formula(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch(); (Path(root) / 'adb.exe').touch()
+            console = Mock(exe=exe); console.selected.return_value = ''
+            listed = Mock(stdout='emulator-5554 device\nemulator-5580 device\n', stderr='', returncode=0)
+            wrong, correct = Mock(), Mock()
+            wrong.shell.return_value = 'No such file'
+            correct.shell.return_value = '/data/local/tmp/g1plus-device-marker'
+            with patch('ldplayer.run', return_value=listed), patch('ldplayer.Adb', side_effect=[wrong, correct]), \
+                    patch('ldplayer.secrets.token_hex', return_value='marker'), redirect_stdout(io.StringIO()):
+                self.assertIs(ldplayer.connect_verified(console, 0, timeout=0), correct)
+            wrong.connect.assert_not_called()
+            wrong.root.assert_not_called(); correct.root.assert_not_called()
+
+    def test_failed_tcp_hint_does_not_hide_a_registered_emulator(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch(); (Path(root) / 'adb.exe').touch()
+            console = Mock(exe=exe); console.selected.return_value = ''
+            results = [Mock(stdout='List of devices attached\n', stderr='', returncode=0),
+                       Mock(stdout='', stderr='connect refused 10061', returncode=1),
+                       Mock(stdout='emulator-5554 device\n', stderr='', returncode=0)]
+            with patch('ldplayer.run', side_effect=results), patch('ldplayer.Adb') as cls, \
+                    patch('ldplayer.secrets.token_hex', return_value='marker'), redirect_stdout(io.StringIO()):
+                cls.return_value.shell.return_value = '/data/local/tmp/g1plus-device-marker'
+                self.assertIs(ldplayer.connect_verified(console, 0, timeout=0), cls.return_value)
+                cls.assert_called_once_with(Path(root) / 'adb.exe', 'emulator-5554', allow_emulator=True)
+
+    def test_empty_list_preserves_real_tcp_error_in_local_report(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch(); (Path(root) / 'adb.exe').touch()
+            console = Mock(exe=exe); console.selected.return_value = 'no devices/emulators found'
+            report = Path(root) / 'diagnostic.json'
+            results = [Mock(stdout='List of devices attached\n', stderr='', returncode=0),
+                       Mock(stdout='', stderr='connect refused 10061', returncode=1),
+                       Mock(stdout='List of devices attached\n', stderr='', returncode=0)]
+            with patch('ldplayer.run', side_effect=results), patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ldplayer.AdbUnavailable, '10061'):
+                    ldplayer.connect_verified(console, 0, timeout=0, diagnostic_path=report)
+                cls.assert_not_called()
+            saved = json.loads(report.read_text())
+            self.assertIn('10061', saved['tcp_response'])
+            self.assertIsNone(saved['verified_serial'])
+
+    def test_offline_device_is_not_probed_or_promoted_to_online(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root) / 'ldconsole.exe'; exe.touch(); (Path(root) / 'adb.exe').touch()
+            console = Mock(exe=exe); console.selected.return_value = ''
+            listed = Mock(stdout='emulator-5554 offline\n', stderr='', returncode=0)
+            with patch('ldplayer.run', return_value=listed), patch('ldplayer.Adb') as cls, redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ldplayer.AdbUnavailable, 'offline'):
+                    ldplayer.connect_verified(console, 0, timeout=0)
+                cls.assert_not_called()
 
     def test_referral_is_original_short_link(self):
         self.assertEqual(ldplayer.REFERRAL_URL, 'https://leap.ldplayer.gg/T4WsicN6b')

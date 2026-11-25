@@ -11,6 +11,7 @@ managed-python/
 venv/
 downloads/
 device.json
+adb-diagnostic.json
 doctor.json
 live-offers.json
 last-error.log

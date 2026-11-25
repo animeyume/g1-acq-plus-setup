@@ -9,7 +9,7 @@ import subprocess
 import time
 import webbrowser
 
-from support import Adb, SetupError
+from support import Adb, SetupError, local_adb_serial, run
 
 REFERRAL_URL = 'https://leap.ldplayer.gg/T4WsicN6b'
 
@@ -213,47 +213,113 @@ def wait_state(console, index, started, timeout=240):
     raise SetupError('LDPlayer не завершил запуск/остановку. Проверьте окно эмулятора и повторите запуск.')
 
 
-def connect_verified(console, index, timeout=90):
+def parse_adb_devices(text):
+    result = []
+    for line in text.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and local_adb_serial(fields[0], allow_emulator=True) and not any(field.startswith('usb:') for field in fields[2:]):
+            result.append({'serial': fields[0], 'state': fields[1]})
+    return result
+
+
+def connect_verified(console, index, timeout=90, diagnostic_path=None):
     exe = console.exe.parent / 'adb.exe'
     if not exe.is_file():
         raise SetupError('В выбранной папке LDPlayer отсутствует adb.exe.')
     port = 5555 + index * 2
-    if port > 65535:
-        raise SetupError('Индекс LDPlayer выходит за диапазон локальных портов.')
-    adb = Adb(exe, f'127.0.0.1:{port}')
+    hint = f'127.0.0.1:{port}' if port < 65536 else None
+    marker = '/data/local/tmp/g1plus-device-' + secrets.token_hex(16)
     deadline = time.monotonic() + timeout
     next_notice = 0
-    while True:
-        now = time.monotonic()
-        if now >= next_notice:
-            print(f'Проверяю локальный ADB {adb.serial} и загрузку Android; осталось {max(0, int(deadline-now))} с.', flush=True)
-            next_notice = now + 10
-        try:
-            adb.connect()
-            break
-        except (SetupError, subprocess.SubprocessError):
+    tcp_tried = False
+    report = {'console': str(console.exe), 'index': index, 'devices': [], 'console_adb': '',
+              'tcp_response': '', 'last_error': '', 'verified_serial': None}
+
+    def save():
+        if diagnostic_path:
+            try:
+                Path(diagnostic_path).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            except OSError:
+                pass
+
+    try:
+        while True:
+            now = time.monotonic()
+            if now >= next_notice:
+                print(f'Ищу ADB-устройство LDPlayer {index}; осталось {max(0, int(deadline-now))} с.', flush=True)
+                next_notice = now + 10
+            try:
+                # Let the vendor console address the selected instance first.
+                # This can also register its emulator transport with adb.
+                report['console_adb'] = console.selected(index, 'adb', '--command', 'shell touch ' + marker)
+            except (SetupError, OSError, subprocess.SubprocessError) as error:
+                report['console_adb'] = str(error)
+            try:
+                listed = run([exe, 'devices', '-l'], timeout=10, check=False)
+                report['devices_output'] = (listed.stdout + listed.stderr).strip()
+                report['devices'] = parse_adb_devices(listed.stdout)
+                if listed.returncode:
+                    report['last_error'] = report['devices_output']
+                online = [row['serial'] for row in report['devices'] if row['state'] == 'device']
+                # Only try the legacy default as a hint if adb has no online
+                # local transports. A failed TCP hint never hides real devices.
+                if not online and hint and not tcp_tried:
+                    tcp_tried = True
+                    connected = run([exe, 'connect', hint], timeout=10, check=False)
+                    report['tcp_response'] = (connected.stdout + connected.stderr).strip()
+                    listed = run([exe, 'devices', '-l'], timeout=10, check=False)
+                    report['devices_output'] = (listed.stdout + listed.stderr).strip()
+                    report['devices'] = parse_adb_devices(listed.stdout)
+                    online = [row['serial'] for row in report['devices'] if row['state'] == 'device']
+                expected = f'emulator-{5554 + index * 2}'
+                online.sort(key=lambda serial: (serial != expected, not serial.startswith('emulator-'), serial))
+                for serial in online:
+                    candidate = Adb(exe, serial, allow_emulator=True)
+                    try:
+                        marker_reply = candidate.shell('ls', marker, timeout=5, check=False).strip()
+                        if marker_reply != marker:
+                            report['last_error'] = serial + ': устройство не подтвердило метку выбранного LDPlayer. ' + marker_reply[-250:]
+                            continue
+                        candidate.connect()
+                    except (SetupError, subprocess.SubprocessError) as error:
+                        report['last_error'] = serial + ': ' + str(error)
+                        continue
+                    candidate.shell('rm', '-f', marker, timeout=5, check=False)
+                    report['verified_serial'] = serial
+                    save()
+                    print('Подтверждено устройство выбранного LDPlayer: ' + serial, flush=True)
+                    return candidate
+            except (SetupError, OSError, subprocess.SubprocessError) as error:
+                report['last_error'] = str(error)
+            save()
             if time.monotonic() >= deadline:
-                raise AdbUnavailable('Локальный ADB LDPlayer недоступен. В настройках включите ADB для локального подключения.')
+                states = ', '.join(row['serial'] + '=' + row['state'] for row in report['devices']) or '(список устройств пуст)'
+                messages = ['Не удалось подтвердить ADB выбранного LDPlayer. Устройства: ' + states]
+                for label, key in (('ADB connect', 'tcp_response'), ('ldconsole adb', 'console_adb'), ('Проверка', 'last_error')):
+                    if report.get(key):
+                        messages.append(label + ': ' + report[key][-500:])
+                if diagnostic_path:
+                    messages.append('Отчёт ADB: ' + str(diagnostic_path))
+                raise AdbUnavailable('\n'.join(messages))
             time.sleep(2)
-    # Prove the documented index-to-port mapping with a fresh marker through
-    # the vendor console before executing root commands over this ADB socket.
-    marker = '/data/local/tmp/g1plus-device-' + secrets.token_hex(16)
-    console.selected(index, 'adb', '--command', 'shell touch ' + marker)
-    if adb.shell('ls', marker, check=False).strip() != marker:
-        raise SetupError('ADB-порт не подтверждён для выбранного LDPlayer. Закройте конфликтующую версию LDPlayer и повторите запуск.')
-    adb.shell('rm', '-f', marker, check=False)
-    return adb
+    finally:
+        if not report['verified_serial']:
+            try:
+                console.selected(index, 'adb', '--command', 'shell rm -f ' + marker)
+            except (SetupError, OSError, subprocess.SubprocessError):
+                pass
 
 
-def connect_interactive(console, index):
-    print('ADB в настройках LDPlayer: Другие настройки → Отладка ADB → Локальное подключение.', flush=True)
+def connect_interactive(console, index, work=None):
+    print('Ищу фактическое локальное ADB-устройство выбранного LDPlayer…', flush=True)
+    diagnostic_path = Path(work) / 'adb-diagnostic.json' if work else None
     while True:
         try:
-            return connect_verified(console, index, timeout=30)
+            return connect_verified(console, index, timeout=30, diagnostic_path=diagnostic_path)
         except AdbUnavailable as error:
             print(str(error), flush=True)
-            print('Выберите Open local connection, сохраните настройки и дождитесь перезапуска устройства.', flush=True)
-            if input('Enter — повторить проверку в этом запуске; Q — выйти: ').strip().lower() == 'q':
+            print('Оставьте выбранное Android-устройство запущенным. Настройка ADB в LDPlayer: Open local connection.', flush=True)
+            if input('Enter — заново найти устройство в этом запуске; Q — выйти: ').strip().lower() == 'q':
                 raise SetupError('Проверка ADB остановлена пользователем.') from error
 
 
@@ -286,7 +352,7 @@ def prepare(work, manager=None, instance=None):
     if not row['started']:
         console.selected(index, 'launch')
         wait_state(console, index, True)
-    adb = connect_interactive(console, index)
+    adb = connect_interactive(console, index, work)
     print('Проверяю права root выбранного устройства…', flush=True)
     if not adb.root():
         snapshot = work / f'ldplayer-before-{index}.json'
@@ -298,10 +364,10 @@ def prepare(work, manager=None, instance=None):
         console.selected(index, 'modify', '--root', 1)
         console.selected(index, 'launch')
         wait_state(console, index, True)
-        adb = connect_interactive(console, index)
+        adb = connect_interactive(console, index, work)
         if not adb.root():
             input('В настройках LDPlayer включите ROOT, перезапустите выбранное устройство и нажмите Enter: ')
-            adb = connect_interactive(console, index)
+            adb = connect_interactive(console, index, work)
             if not adb.root():
                 raise SetupError('LDPlayer не предоставил su -> uid=0. Каталог не запущен.')
     (work / 'device.json').write_text(json.dumps({'platform': 'windows', 'emulator': 'ldplayer',

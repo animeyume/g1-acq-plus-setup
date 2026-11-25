@@ -77,12 +77,20 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def local_adb_serial(serial, allow_emulator=False):
+    match = re.fullmatch(r'127\.0\.0\.1:(\d{1,5})', serial)
+    if match:
+        return 0 < int(match[1]) < 65536
+    match = re.fullmatch(r'emulator-(\d{1,5})', serial) if allow_emulator else None
+    return bool(match and 0 < int(match[1]) < 65536)
+
+
 class Adb:
-    def __init__(self, exe, serial):
+    def __init__(self, exe, serial, *, allow_emulator=False):
         self.exe, self.serial = Path(exe), serial
         if not self.exe.is_file():
             raise SetupError('Не найден ADB: ' + str(self.exe))
-        if not re.fullmatch(r'127\.0\.0\.1:\d{1,5}', serial) or not 0 < int(serial.rsplit(':', 1)[1]) < 65536:
+        if not local_adb_serial(serial, allow_emulator):
             raise SetupError('Укажите локальный ADB-порт выбранного эмулятора: 127.0.0.1:PORT.')
 
     def command(self, *args, timeout=30, check=True):
@@ -93,9 +101,11 @@ class Adb:
         return (result.stdout + result.stderr).strip()
 
     def connect(self):
-        run([self.exe, 'connect', self.serial], timeout=15)
-        if self.shell('getprop', 'sys.boot_completed') != '1':
-            raise SetupError('Android ещё не загрузился или локальный ADB отключён.')
+        if self.serial.startswith('127.0.0.1:'):
+            run([self.exe, 'connect', self.serial], timeout=10)
+        result = self.command('shell', 'getprop sys.boot_completed', timeout=10)
+        if result.stdout.strip().splitlines()[-1:] != ['1']:
+            raise SetupError('ADB отвечает, но Android ещё не завершил загрузку: ' + (result.stdout.strip() or '(пустой ответ)'))
 
     def root(self):
         for args in (('su', '-c', 'id'), ('su', '0', 'id')):
