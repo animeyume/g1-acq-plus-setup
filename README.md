@@ -27,7 +27,7 @@
 ### Windows — PowerShell (одна строка)
 
 ```powershell
-irm 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/831736d5209747f365b2910590958966d6144fac/Windows-OneClick.ps1' -OutFile "$env:TEMP\G1AcqPlus-setup.ps1"; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\G1AcqPlus-setup.ps1"
+irm https://github.com/animeyume/g1-acq-plus-setup/releases/latest/download/Start-G1.ps1 | iex
 ```
 
 Для **cmd** или для одного вызова с проверкой SHA256 возьмите вторую команду из [COMMANDS.txt](COMMANDS.txt), либо скачайте [архив для Windows](G1AcqPlus-Windows-Local.zip) и запустите `START.cmd`.
