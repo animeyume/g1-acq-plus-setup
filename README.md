@@ -29,6 +29,10 @@
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr 'https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/d73a3fdb1356c8c69001d1398e3a713d207e7f73/Windows-OneClick.ps1' -UseBasicParsing | iex"
 ```
 
+> Если при копировании двойные кавычки заменились на «ёлочки» (`«…»`), PowerShell примет `{ … }` за отдельный script block и напишет `Параметр ScriptBlock следует указывать только в качестве значения параметра Command`. Вставьте команду в Блокнот и верните обычные `"` — либо используйте вариант без кавычек, который кладёт установщик в текущую папку:
+>
+> `curl.exe -fsSL https://raw.githubusercontent.com/animeyume/g1-acq-plus-setup/d73a3fdb1356c8c69001d1398e3a713d207e7f73/Windows-OneClick.ps1 -o g1.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File g1.ps1`
+
 ### Mac — Terminal
 
 ```zsh
