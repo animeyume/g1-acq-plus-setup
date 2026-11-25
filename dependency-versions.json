@@ -1,0 +1,10 @@
+{
+  "frida": "17.27.4",
+  "frida-tools": "14.13.2",
+  "colorama": "0.4.6",
+  "prompt-toolkit": "3.0.53",
+  "pygments": "2.21.0",
+  "websockets": "13.1",
+  "wcwidth": "0.9.4",
+  "certifi": "2026.11.20"
+}

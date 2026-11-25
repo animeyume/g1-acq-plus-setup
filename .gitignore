@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.tools/
+.runtime-test/
+.integration*/
+dist/
+.publish/
+assets/
+cache/
+managed-python/
+venv/
+downloads/
+device.json
+doctor.json
+live-offers.json
+last-error.log
+*-before-*.json

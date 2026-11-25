@@ -1,0 +1,682 @@
+{
+  "source": "https://github.com/Dgkncn/g1-acq-plus",
+  "commit": "c9c91e8e4e315edf62d949e0fe33e30502559218",
+  "catalog_products": 124,
+  "products": [
+    {
+      "id": "g1.100gb",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.12months_ip.0.49",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.12months_ip.0.99",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_ip.0.49",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_ip.0.99",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_ip_50p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_ip_85p.acq",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1month_ip_95p.acq",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.1year_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.2months_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.2months_ip_75p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.3months_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.3months_ip_50p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.3months_ip_50p.acq",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.3months_ip_85p.acq",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.6months_ip.0.99",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.6months_ip_75p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.9months_eft",
+      "label": "g1.100gb.9months_eft",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.100gb.annual",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.12months_ip_10p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.12months_ip_15p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.12months_ip_20p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.12months_ip_40p",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.1month_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.1year_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.100gb.annual.3months_eft",
+      "label": "100 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.10tb",
+      "label": "Google AI Pro (10 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.12months_ip.1.49",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.1month_eft",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.1month_ip_50p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.1month_ip_85p.acq",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.1month_ip_95p.acq",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.1year_eft",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.2months_ip_75p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.3months_eft",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.3months_ip_50p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.3months_ip_50p.acq",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.3months_ip_85p.acq",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.6months_ip.1.49",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.12months_ip_10p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.12months_ip_15p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.12months_ip_20p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.12months_ip_40p",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.1month_eft",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.200gb.annual.3months_eft",
+      "label": "200 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.20tb.1month_eft.acq",
+      "label": "g1.20tb.1month_eft.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.20tb.3months_ip_90p.acq",
+      "label": "g1.20tb.3months_ip_90p.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.20tb.v2",
+      "label": "Google AI Ultra (20 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.12months_ip.4.99",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip.2.49",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip_50p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip_80p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip_85p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip_90p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1month_ip_95p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.1year_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.2months_ip_50p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.2months_ip_75p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.2months_ip_80p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_ip.2.49",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_ip_50p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_ip_50p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_ip_80p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.3months_ip_85p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.6months_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.6months_ip.4.99",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.12months_eft",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.12months_ip_75p",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.12months_ip_90p",
+      "label": "g1.2tb.ai.12months_ip_90p",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.15months_eft",
+      "label": "g1.2tb.ai.15months_eft",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.18months_eft",
+      "label": "g1.2tb.ai.18months_eft",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.1month_ip_95p.acq",
+      "label": "g1.2tb.ai.1month_ip_95p.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.2months_eft",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.2months_ip_50p",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.3months_eft",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.3months_ip_50p",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.3months_ip_90p.acq",
+      "label": "g1.2tb.ai.3months_ip_90p.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.4months_eft",
+      "label": "g1.2tb.ai.4months_eft",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.2tb.ai.6months_eft",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.annual",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.ai.subs_variant",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.12months_ip_10p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.12months_ip_15p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.12months_ip_20p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.12months_ip_25p.acq",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.12months_ip_40p",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.1month_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.annual.3months_eft",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.2tb.subs_variant",
+      "label": "Google AI Plus (2 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.12month_ip_50p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.1month_eft",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.1month_ip_75p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.1month_ip_85p.acq",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.1month_ip_95p.acq",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.3month_ip_75p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.3months_ip_50p.acq",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.3months_ip_85p.acq",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.6month_ip_50p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual.1month_eft",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual.1year_ip_10p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual.1year_ip_15p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual.1year_ip_20p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.30gb.annual.1year_ip_40p",
+      "label": "30 GB",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.5tb",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.5tb.annual",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.ai.pro",
+      "label": "Google AI Ultra (30 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.ai.ultra.1month_eft.acq",
+      "label": "g1.ai.ultra.1month_eft.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.ai.ultra.3months_ip_90p.acq",
+      "label": "g1.ai.ultra.3months_ip_90p.acq",
+      "catalog_seen": false
+    },
+    {
+      "id": "g1.helium.12months_ip_50p",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.12months_ip_75p",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.12months_ip_90p",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.1month_ip_75p.acq",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.1month_ip_90p.acq",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.1month_ip_95p",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.2months_ip_50p",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.3months_ip_75p.acq",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.annual.12months_ip_10p.acq",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.helium.annual.12months_ip_25p.acq",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.20tb",
+      "label": "Google AI Ultra (20 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.2tb.ai",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.2tb.ai.student",
+      "label": "Google AI Pro (5 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.ai.pro",
+      "label": "Google AI Ultra (30 TB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.helium",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.play.helium.student",
+      "label": "Google AI Plus (400 GB)",
+      "catalog_seen": true
+    },
+    {
+      "id": "g1.youtube_premium_individual_add_on",
+      "label": "YouTube Premium Individual Add On",
+      "catalog_seen": true
+    }
+  ]
+}
